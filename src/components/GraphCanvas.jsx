@@ -100,15 +100,23 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
 
     if (matchIds && matchIds.length) {
       let keep = cy.collection();
+      let matched = cy.collection();
       matchIds.forEach((id) => {
         const n = cy.getElementById(id);
-        if (n.nonempty()) keep = keep.union(n).union(n.ancestors());
+        if (n.nonempty()) {
+          // Node match + ancestor (agar compound tak orphan) + descendant
+          // (agar aksi L3 di dalam fitur yang ter-highlight tidak ikut ter-fade).
+          keep = keep.union(n).union(n.ancestors()).union(n.descendants());
+          matched = matched.union(n);
+        }
       });
       // keep hanya berisi node — keep.edges() selalu kosong. Ambil edge yang
       // kedua ujungnya (source & target) ada di keep agar panah ikut tersorot.
       const keepEdges = keep.edgesWith(keep);
       cy.elements().not(keep).not(keepEdges).addClass('faded');
-      cy.collection(matchIds.map((id) => cy.getElementById(id)).filter((n) => n.nonempty())).addClass('match');
+      matched.addClass('match');
+      // Aksi (L3) milik fitur yang ter-highlight juga disorot.
+      matched.descendants().addClass('match');
       keepEdges.addClass('highlight');
       return;
     }
