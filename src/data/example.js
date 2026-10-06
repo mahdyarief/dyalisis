@@ -56,6 +56,11 @@ export const DECISIONS = [
     context: 'Shipment dan Invoice sama-sama mengurangi stok via sku.',
     decision: 'Semua mutasi stok lewat entitas Inventory (sku sebagai kunci).' }
 ];
+// Glosarium istilah (opsional) — tampil di panel Dokumentasi (arc42 §12).
+export const GLOSSARY = [
+  { term: 'order_id', definition: 'Kunci pesanan yang mengikat Shipment & Invoice.' },
+  { term: 'sku', definition: 'Kode stok barang — kunci entitas Inventory.' }
+];
 export const LEVELS = { 0: ['app'], 1: MODULES.map((m) => m.id), 2: NODES.map((n) => n.id), 3: ACTIONS.map((a) => a.id) };
 export const LEVEL_NAMES = { 0: 'Aplikasi', 1: 'Modul', 2: 'Fitur', 3: 'Aksi' };
 export const levelOf = (id) => { for (const k in LEVELS) if (LEVELS[k].includes(id)) return +k; return 0; };

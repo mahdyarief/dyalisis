@@ -499,7 +499,8 @@ export default function DyalisisApp() {
       {docsOpen && (
         <DocsPanel app={APP} modules={C.MODULES || []} features={C.NODES || []}
           actions={C.ACTIONS || []} edges={C.DATA_EDGES || []} domains={domains}
-          decisions={C.DECISIONS || []} onClose={() => setDocsOpen(false)} />
+          decisions={C.DECISIONS || []} arc42={C.ARC42 || []} glossary={C.GLOSSARY || []}
+          docs={C.DOCS || []} onClose={() => setDocsOpen(false)} />
       )}
     </div>
   );

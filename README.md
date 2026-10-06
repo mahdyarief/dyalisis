@@ -25,8 +25,10 @@ operasi dari aksi, asosiasi berlabel field penghubung) — digambar sebagai SVG
 inline, theme-aware, tanpa dependency tambahan. Klik diagram → **modal perbesar**.
 Mode **Alur** menyorot rantai fitur end-to-end dari relasi data (mis. Pendaftaran →
 Periksa → SOAP → Resep → Billing) di sidebar + highlight pada graph. Panel
-**Dokumentasi** (ikon buku di header) menyusun perspektif **C4 Model**, outline
-**arc42**, daftar **ADR** (dari `DECISIONS` opsional), dan panduan **Diátaxis**.
+**Dokumentasi** (ikon buku di header) menyusun perspektif **C4 Model**, **arc42**
+(12 seksi lengkap), daftar **ADR** (dari `DECISIONS` opsional), **glosarium**
+(dari `GLOSSARY` opsional), dan **Diátaxis** (artefak nyata dari data). Tiap seksi
+punya default turunan dari data; content boleh menimpanya lewat `ARC42`/`DOCS`.
 
 ## Quickstart
 

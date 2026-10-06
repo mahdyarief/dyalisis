@@ -17,7 +17,7 @@ const dagre = require('cytoscape-dagre');
 const elk = require('cytoscape-elk');
 
 // Default ke content demo (example.js) supaya `npm test` jalan di repo framework
-// yang tidak membawa data aplikasi. Override: `--content src/data/softmedis.js`.
+// yang tidak membawa data aplikasi. Override: `--content src/data/<app>.js`.
 const args = process.argv.slice(2);
 const contentArg = args[args.indexOf('--content') + 1];
 const CONTENT = contentArg ? resolve(REPO, contentArg) : resolve(REPO, 'src/data/example.js');

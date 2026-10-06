@@ -110,6 +110,15 @@ export const LEVEL_NAMES = { 0:'Aplikasi', 1:'Modul', 2:'Fitur', 3:'Aksi' };
 export const levelOf = (id) => { /* 0..3 */ };
 ```
 
+**Simbol opsional (memperkaya panel Dokumentasi):**
+
+```js
+export const DECISIONS = [{ title, status, context, decision }]; // ADR (arc42 §9)
+export const ARC42     = [{ no: 2, body: '...' }];               // override narasi seksi arc42 (1–12)
+export const GLOSSARY  = [{ term, definition }];                 // glosarium (arc42 §12)
+export const DOCS      = [{ kind: 'How-to', items: ['...'] }];   // artefak Diátaxis (menimpa turunan)
+```
+
 **Aturan struktur yang diuji `npm test`:**
 - `id` unik di seluruh node.
 - `parent` tiap node merujuk id yang ada; **tanpa siklus**.
@@ -126,11 +135,21 @@ tanpa itu dipakai `label`. Tipe atribut ditebak dari pola nama (ref/date/number/
 string). Tidak perlu konfigurasi tambahan.
 
 **Panel Dokumentasi (`DocsPanel.jsx`):** dibuka dari ikon buku di header. Menyusun
-empat perspektif arsitektur dari data yang sudah ada: **C4 Model** (pemetaan
-L0–L3 → Context/Container/Component/Code + jumlah), **arc42** (outline relevan),
-**ADR** (dari array opsional `DECISIONS`), dan **Diátaxis** (cara menulis
-dokumentasi). `DECISIONS` (opsional) berbentuk `{ title, status, context, decision }`
-dengan `status` salah satu dari `proposed|accepted|rejected|deprecated`.
+empat perspektif arsitektur — **seluruhnya content-agnostic**: nilai default
+dihitung dari data, lalu content boleh menimpa lewat simbol opsional.
+
+- **C4 Model** — pemetaan L0–L3 → Context/Container/Component/Code + jumlah node.
+- **arc42** — **12 seksi lengkap** (Intro & Goals, Constraints, Context & Scope,
+  Solution Strategy, Building Blocks, Runtime View, Deployment, Crosscutting,
+  Decisions, Quality, Risks & Debt, Glossary). Tiap seksi punya ringkasan turunan
+  dari data; content dapat menimpanya lewat `ARC42: [{ no, body }]` (nomor seksi 1–12).
+- **ADR** — dari array opsional `DECISIONS`: `{ title, status, context, decision }`
+  dengan `status` salah satu dari `proposed|accepted|rejected|deprecated`.
+- **Glosarium** — dari array opsional `GLOSSARY`: `{ term, definition }` (tampil di
+  seksi tersendiri + mengisi arc42 §12).
+- **Diátaxis** — empat jenis dokumen (Tutorial/How-to/Reference/Explanation) dengan
+  **artefak nyata** diturunkan dari data (modul awal, fitur+route, katalog field,
+  relasi data); content dapat menimpanya lewat `DOCS: [{ kind, items }]`.
 
 **Mode Alur:** tombol "Alur" di kanan-bawah kanvas menyorot rantai fitur
 end-to-end dari `DATA_EDGES`; sidebar menampilkan langkah berurutan + field
@@ -195,3 +214,63 @@ Repo mengirim **hanya engine**; data aplikasi tidak ikut. `.gitignore` sudah
 mengecualikan `node_modules/`, `dist/`, `src/content.js`, dan semua
 `src/data/*` kecuali `example.js`. Aman: pengguna repo menjalankan
 `npm install && npm run build` dan langsung dapat demo dari `example.js`.
+## 11. Case study — contoh SIMRS SaaS multi-tenant
+
+Contoh anonim pemakaian Dyalisis pada sebuah aplikasi **SIMRS/HMS** (sistem
+informasi rumah sakit modern, SaaS multi-tenant, Laravel + Inertia.js +
+Livewire). Content: `src/data/<app>.js` (mis. 30-an fitur, 7 domain, ratusan
+route dan permission) — dipakai sebagai studi kasus untuk membuktikan panel
+Dokumentasi terisi penuh dari data nyata.
+
+**Pemetaan 4 level → C4:**
+
+| Level | C4 | Contoh SIMRS |
+|---|---|---|
+| L0 | Context | SIMRS (tenant SaaS) |
+| L1 | Container | Pendaftaran, Klinis, Farmasi, Keuangan, SDM & Aset, Bridging, Master & Setting |
+| L2 | Component | fitur (Pendaftaran Pasien, SOAP, E-Resep, Billing, Jurnal, bridging BPJS, bridging FHIR, …) |
+| L3 | Code | aksi/route tiap fitur (mis. `registrasi/*`, `api/antrian/*`) |
+
+**arc42 terisi (beberapa seksi naratif + sisanya turunan otomatis).** Karena
+framework menghitung default dari data, hanya seksi yang butuh narasi domain
+yang diisi lewat `ARC42`:
+
+```js
+export const ARC42 = [
+  { no: 2,  body: 'Laravel/Inertia/Livewire (SPA), named routes; DB per tenant; auth token + 2FA panel admin; integrasi eksternal: bridging BPJS & FHIR.' },
+  { no: 4,  body: 'SaaS multi-tenant (database per tenant); modul dipisah per domain; RBAC granular menggerakkan visibilitas menu.' },
+  { no: 7,  body: 'Aplikasi tenant + panel super-admin terpisah; siklus hidup trial → active → readonly → suspend → archive.' },
+  { no: 10, body: 'Transaksi klinis-billing utuh; jejak audit via jurnal double-entry; interoperabilitas FHIR.' },
+  { no: 11, body: 'Ratusan route & permission = permukaan uji besar; ketergantungan pada satu kunci kunjungan; integrasi eksternal rawan downtime partner.' }
+];
+```
+
+Seksi lain (Intro & Goals, Context & Scope, Building Blocks, Runtime View,
+Crosscutting, Decisions, Glossary) terisi otomatis: dari `app.subtitle`,
+jumlah modul/fitur/aksi, jumlah `DATA_EDGES`, dan `DECISIONS`/`GLOSSARY`.
+Kunci kunjungan muncul sebagai contoh hubungan kunci bisnis di seksi Glossary
+dan Crosscutting (mengikat klinis → farmasi → keuangan).
+
+**Diátaxis terisi dengan artefak nyata.** Tanpa `DOCS`, framework sudah
+menurunkan artefak dari data: *Tutorial* = daftar modul sebagai titik masuk;
+*How-to* = fitur + route-nya; *Reference* = jumlah fitur/field/permission/relasi;
+*Explanation* = relasi data antar fitur. Pada SIMRS, `DOCS` dipakai untuk
+menyampaikan alur end-to-end yang spesifik domain:
+
+```js
+export const DOCS = [
+  { kind: 'Tutorial', items: ['Mulai Pendaftaran → terbitkan ID rekam medis, live ID kunjungan.', 'Lanjut Klinis → SOAP, resep, lab/rad.', 'Tutup Keuangan → billing, kasir, jurnal.'] },
+  { kind: 'How-to',   items: ['Daftarkan pasien: pendaftaran → registrasi periksa.', 'Resep & serahkan obat: rawat-jalan → farmasi.', 'Tagih & bayar: billing → kasir → akuntansi/jurnal.'] },
+  { kind: 'Reference', items: ['Kunci lintas modul: <id_kunjungan>, <id_pasien>, <kode_unit>, <kode_barang>, <kode_akun>.', 'ratusan route · puluhan segmen URI · puluhan keluarga API · ratusan permission.'] },
+  { kind: 'Explanation', items: ['<id_kunjungan> = kunci tunggal klinis → farmasi → keuangan.', 'SaaS multi-tenant: satu basis kode, DB per fasyankes.'] }
+];
+```
+
+**ADR** (`DECISIONS`) mencatat keputusan arsitektur inti: SaaS
+database-per-tenant, satu kunci kunjungan sebagai kunci tunggal, RBAC granular
+menggerakkan menu, dan integrasi eksternal diisolasi di modul bridging.
+
+**Pelajarannya:** panel Dokumentasi tidak perlu konfigurasi penuh — framework
+sudah menyediakan default dari data; content cukup menyuplai bagian naratif
+yang tak bisa diturunkan (batasan, strategi, deployment, kualitas, risiko,
+glosarium, dan alur domain-spesifik).

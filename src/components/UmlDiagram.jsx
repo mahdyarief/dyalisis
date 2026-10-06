@@ -36,7 +36,7 @@ function truncate(s, n) {
   return t.length > n ? t.slice(0, n - 1) + '\u2026' : t;
 }
 
-// Pisahkan anotasi dalam tanda kurung (mis. "no_rkm_medis (probe ROW)") jadi {name, note}.
+// Pisahkan anotasi dalam tanda kurung (mis. "nama_kolom (catatan)") jadi {name, note}.
 function stripNote(s) {
   const m = /^([^(]+?)\s*(?:\((.*)\))?$/.exec(String(s).trim());
   return { name: (m ? m[1] : s).trim(), note: m && m[2] ? m[2].trim() : '' };
