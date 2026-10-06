@@ -53,3 +53,9 @@
   html, body, #root { height: 100%; }
   body { @apply bg-background text-foreground; }
 }
+
+@layer utilities {
+  /* Sembunyikan scrollbar visual, tetap bisa di-scroll (wheel/touch). */
+  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+}

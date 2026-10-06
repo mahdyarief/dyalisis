@@ -20,6 +20,11 @@ Dekomposisi fungsional 4 tingkat, digambar sebagai *compound boundary boxes*
 
 Graph interaktif: pan/zoom, ganti layout (Dagre/ELK/Breadthfirst/Circle/Grid),
 klik node → sidebar detail, seleksi meredupkan elemen tak terkait, toggle L3.
+Tiap node punya **UML class diagram** di sidebar (atribut dari field kunci,
+operasi dari aksi, asosiasi berlabel field penghubung) — digambar sebagai SVG
+inline, theme-aware, tanpa dependency tambahan. Klik diagram → **modal perbesar**.
+Mode **Alur** menyorot rantai fitur end-to-end dari relasi data (mis. Pendaftaran →
+Periksa → SOAP → Resep → Billing) di sidebar + highlight pada graph.
 
 ## Quickstart
 

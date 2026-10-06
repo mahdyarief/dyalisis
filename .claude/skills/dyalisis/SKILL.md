@@ -14,6 +14,11 @@ hierarki 4 level dan digambar sebagai *boundary boxes* bergaya C4.
 - `dist/index.html` — SATU file, CSS + JS ter-inline. Buka langsung di browser.
 - Graph interaktif: pan/zoom, layout berganti, klik node → sidebar detail,
   seleksi meredupkan elemen tak terkait, toggle level aksi (L3).
+- **UML class diagram per node** di sidebar: kotak kelas 3 kompartemen
+  («stereotype» + nama / atribut dari `fields` / operasi dari anak) + asosiasi
+  ke kelas tetangga berlabel field penghubung. SVG inline, theme-aware, tanpa
+  dependency baru. Pratinjau kecil bisa **diklik → modal perbesar** (portal ke
+  `<body>`, tutup via klik luar / Esc).
 
 Model data = dekomposisi fungsional 4 tingkat:
 
@@ -84,7 +89,8 @@ export const MODULES = [                                     // L1 — 1 per dom
 ];
 
 export const NODES = [                                       // L2 — fitur
-  { id, label, domain, desc, fields, route, perm }
+  { id, label, domain, desc, fields, route, perm,
+    entity }                                                 // entity = nama class UML (opsional)
 ];
 
 export const ACTIONS = [                                     // L3 — aksi/route
@@ -112,6 +118,12 @@ export const levelOf = (id) => { /* 0..3 */ };
 - Tiap modul punya ≥1 fitur; tiap fitur punya ≥1 aksi.
 - `LEVELS` konsisten dengan panjang `MODULES`/`NODES`/`ACTIONS`; `levelOf` benar.
 - Semua `domain` node/aksi terdaftar di `DOMAINS`.
+
+**UML class diagram (otomatis dari data):** komponen `UmlDiagram.jsx` mengubah
+`fields` (CSV) jadi atribut kelas, anak node jadi operasi, dan `DATA_EDGES` yang
+menyentuh node jadi asosiasi berlabel field. `entity` (opsional) menamai kelas;
+tanpa itu dipakai `label`. Tipe atribut ditebak dari pola nama (ref/date/number/
+string). Tidak perlu konfigurasi tambahan.
 
 ## 5. Menambah aplikasi baru (langkah)
 

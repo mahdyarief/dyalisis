@@ -9,8 +9,14 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
-const contentArg = args[args.indexOf('--content') + 1];
-const outArg = args[args.indexOf('--out') + 1];
+// Ambil nilai flag hanya bila flag benar-benar ada; jika tidak, indexOf = -1 dan
+// args[indexOf+1] akan salah menangkap args[0] (bug: --content jadi output path).
+const flagValue = (name) => {
+  const i = args.indexOf(name);
+  return i >= 0 ? args[i + 1] : undefined;
+};
+const contentArg = flagValue('--content');
+const outArg = flagValue('--out');
 
 // Default = example.js (content demo generik yang ikut di-ship bersama framework).
 // Framework tidak bergantung pada data aplikasi apa pun; ganti via `--content`.
