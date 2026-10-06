@@ -111,8 +111,10 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
         }
       });
       // keep hanya berisi node — keep.edges() selalu kosong. Ambil edge yang
-      // kedua ujungnya (source & target) ada di keep agar panah ikut tersorot.
-      const keepEdges = keep.edgesWith(keep);
+      // kedua ujungnya (source & target) ada di keep, PLUS semua edge yang
+      // menyentuh node alur (matched) — termasuk panah yang masuk dari luar
+      // container — agar head arrow-nya ikut berwarna, bukan tersisa garis pudar.
+      const keepEdges = keep.edgesWith(keep).union(matched.connectedEdges());
       cy.elements().not(keep).not(keepEdges).addClass('faded');
       matched.addClass('match');
       // Aksi (L3) milik fitur yang ter-highlight juga disorot.
