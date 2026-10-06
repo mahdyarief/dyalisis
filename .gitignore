@@ -1,0 +1,14 @@
+# Dependencies & build artifacts
+node_modules/
+dist/
+src/content.js
+
+# Content aplikasi — framework hanya mengirim example.js (demo generik).
+# Semua file data lain diabaikan; pemakai repo menambahkan datanya sendiri.
+src/data/*
+!src/data/example.js
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

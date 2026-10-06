@@ -1,0 +1,29 @@
+{
+  "name": "dyalisis",
+  "version": "0.1.0",
+  "description": "Reusable feature-analysis visualization engine (Cytoscape.js + shadcn/ui) — flow/flowchart/UML/node-flow for app documentation. Compiled to single self-contained HTML. Engine & content detachable. Framework: Dyalisis.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test/run.mjs",
+    "postinstall": "node scripts/patch-elk.mjs"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.1.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cytoscape": "^3.32.0",
+    "cytoscape-dagre": "^4.0.1",
+    "cytoscape-elk": "^1.1.0",
+    "cytoscape-popper": "^2.0.0",
+    "elkjs": "^0.9.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.5.4"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17"
+  }
+}
