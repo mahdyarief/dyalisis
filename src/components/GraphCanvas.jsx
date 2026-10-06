@@ -104,7 +104,9 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
         const n = cy.getElementById(id);
         if (n.nonempty()) keep = keep.union(n).union(n.ancestors());
       });
-      const keepEdges = keep.edges();
+      // keep hanya berisi node — keep.edges() selalu kosong. Ambil edge yang
+      // kedua ujungnya (source & target) ada di keep agar panah ikut tersorot.
+      const keepEdges = keep.edgesWith(keep);
       cy.elements().not(keep).not(keepEdges).addClass('faded');
       cy.collection(matchIds.map((id) => cy.getElementById(id)).filter((n) => n.nonempty())).addClass('match');
       keepEdges.addClass('highlight');
