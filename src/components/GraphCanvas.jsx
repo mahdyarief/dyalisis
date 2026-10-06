@@ -127,8 +127,8 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
     const neighborNodes = node.neighborhood().nodes();
     let keep = node.union(node.ancestors()).union(node.descendants()).union(node.neighborhood());
     neighborNodes.forEach((n) => { keep = keep.union(n.ancestors()); });
-    const keepEdges = keep.edges().union(node.connectedEdges());
-    cy.elements().not(keep).addClass('faded');
+    const keepEdges = keep.edgesWith(keep).union(node.connectedEdges());
+    cy.elements().not(keep).not(keepEdges).addClass('faded');
     keepEdges.addClass('highlight');
   }, [selectedId, matchIds]);
 
