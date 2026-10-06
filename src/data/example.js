@@ -44,6 +44,18 @@ export const DATA_EDGES = [
   ['invoices', 'inventory', 'sku'],
   ['users', 'orders', 'user_id']
 ];
+// Architecture Decision Records (opsional) — tampil di panel Dokumentasi.
+// Bentuk: { title, status: proposed|accepted|rejected|deprecated, context, decision }
+export const DECISIONS = [
+  { title: 'Pisahkan Order menjadi Shipment & Invoice',
+    status: 'accepted',
+    context: 'Satu pesanan bisa dikirim bertahap dan ditagih terpisah.',
+    decision: 'Order jadi entitas induk; Shipment dan Invoice merujuk order_id.' },
+  { title: 'Inventory sebagai sumber tunggal stok',
+    status: 'accepted',
+    context: 'Shipment dan Invoice sama-sama mengurangi stok via sku.',
+    decision: 'Semua mutasi stok lewat entitas Inventory (sku sebagai kunci).' }
+];
 export const LEVELS = { 0: ['app'], 1: MODULES.map((m) => m.id), 2: NODES.map((n) => n.id), 3: ACTIONS.map((a) => a.id) };
 export const LEVEL_NAMES = { 0: 'Aplikasi', 1: 'Modul', 2: 'Fitur', 3: 'Aksi' };
 export const levelOf = (id) => { for (const k in LEVELS) if (LEVELS[k].includes(id)) return +k; return 0; };

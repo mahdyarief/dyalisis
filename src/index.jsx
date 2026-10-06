@@ -6,10 +6,11 @@ import { cn } from './lib/utils.js';
 import GraphCanvas from './components/GraphCanvas.jsx';
 import Legend from './components/Legend.jsx';
 import UmlDiagram from './components/UmlDiagram.jsx';
+import DocsPanel from './components/DocsPanel.jsx';
 import {
   IconPlus, IconMinus, IconFit, IconDownload, IconSun, IconMoon,
   IconSearch, IconPanel, IconChevron, IconArrowRight, IconArrowLeft, IconTarget,
-  IconChevronDown, IconCheck
+  IconChevronDown, IconCheck, IconBook
 } from './components/icons.jsx';
 // Content layer — di-generate build.mjs dari --content (detachable).
 import * as C from './content.js';
@@ -47,6 +48,12 @@ function buildFlow(startId, dataEdges) {
   return [...back, startId, ...fwd];
 }
 
+// Field penghubung antara dua fitur berurutan (untuk label di Alur).
+function edgeField(fromId, toId, dataEdges) {
+  const e = (dataEdges || []).find(([s, t]) => s === fromId && t === toId);
+  return e ? e[2] : null;
+}
+
 export default function DyalisisApp() {
   const [layoutName, setLayoutName] = React.useState(DEFAULT_LAYOUT);
   const [selectedId, setSelectedId] = React.useState(null);
@@ -57,6 +64,7 @@ export default function DyalisisApp() {
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
   const [layoutMenuOpen, setLayoutMenuOpen] = React.useState(false);
   const [flowMode, setFlowMode] = React.useState(false);
+  const [docsOpen, setDocsOpen] = React.useState(false);
   const searchRef = React.useRef(null);
   const layoutMenuRef = React.useRef(null);
 
@@ -173,6 +181,9 @@ export default function DyalisisApp() {
     return [];
   }, [query, matchIds, flowMode, flowPath]);
 
+  // Posisi node terpilih di dalam jalur Alur (untuk navigasi langkah).
+  const flowIdx = selected ? flowPath.indexOf(selected.id) : -1;
+
   // Pilih node + pastikan ia terlihat (jika tersembunyi karena filter/toggle).
   const selectNode = React.useCallback((id) => {
     const node = byIdAll[id];
@@ -256,6 +267,10 @@ export default function DyalisisApp() {
           <Badge variant="secondary" className="hidden sm:inline-flex">{(C.MODULES || []).length} Modul</Badge>
           <Badge variant="secondary" className="hidden sm:inline-flex">{(C.NODES || []).length} Fitur</Badge>
           <Badge variant="secondary" className="hidden md:inline-flex">{edges.length} Relasi</Badge>
+          <Button size="icon" variant="ghost" title="Dokumentasi arsitektur (C4 · arc42 · ADR · Diátaxis)"
+            onClick={() => setDocsOpen(true)}>
+            <IconBook />
+          </Button>
           <Button size="icon" variant="ghost" title={theme === 'dark' ? 'Mode terang' : 'Mode gelap'}
             onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}>
             {theme === 'dark' ? <IconSun /> : <IconMoon />}
@@ -431,15 +446,31 @@ export default function DyalisisApp() {
                     <div className="space-y-1">
                       {flowPath.map((id, i) => {
                         const n = byIdAll[id];
+                        const linkField = i > 0 ? edgeField(flowPath[i - 1], id, C.DATA_EDGES) : null;
                         return (
-                          <button key={id} className={cn('flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-muted',
-                            id === selectedId && 'bg-muted font-medium')}
-                            onClick={() => selectNode(id)}>
-                            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] text-muted-foreground">{i + 1}</span>
-                            <span className="flex-1 truncate">{n ? n.label : id}</span>
-                          </button>
+                          <React.Fragment key={id}>
+                            {linkField && (
+                              <p className="pl-6 text-[9px] italic text-muted-foreground">↳ via {linkField}</p>
+                            )}
+                            <button className={cn('flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-muted',
+                              id === selectedId && 'bg-muted font-medium')}
+                              onClick={() => selectNode(id)}>
+                              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] text-muted-foreground">{i + 1}</span>
+                              <span className="flex-1 truncate">{n ? n.label : id}</span>
+                            </button>
+                          </React.Fragment>
                         );
                       })}
+                    </div>
+                    <div className="mt-2 flex gap-1">
+                      <Button size="sm" variant="outline" className="flex-1 gap-1" disabled={flowIdx <= 0}
+                        onClick={() => selectNode(flowPath[flowIdx - 1])}>
+                        <IconArrowLeft className="h-3.5 w-3.5" /> Sebelumnya
+                      </Button>
+                      <Button size="sm" variant="outline" className="flex-1 gap-1" disabled={flowIdx < 0 || flowIdx >= flowPath.length - 1}
+                        onClick={() => selectNode(flowPath[flowIdx + 1])}>
+                        Berikutnya <IconArrowRight className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -464,6 +495,12 @@ export default function DyalisisApp() {
           )}
         </aside>
       </div>
+
+      {docsOpen && (
+        <DocsPanel app={APP} modules={C.MODULES || []} features={C.NODES || []}
+          actions={C.ACTIONS || []} edges={C.DATA_EDGES || []} domains={domains}
+          decisions={C.DECISIONS || []} onClose={() => setDocsOpen(false)} />
+      )}
     </div>
   );
 }

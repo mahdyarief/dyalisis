@@ -24,7 +24,9 @@ Tiap node punya **UML class diagram** di sidebar (atribut dari field kunci,
 operasi dari aksi, asosiasi berlabel field penghubung) — digambar sebagai SVG
 inline, theme-aware, tanpa dependency tambahan. Klik diagram → **modal perbesar**.
 Mode **Alur** menyorot rantai fitur end-to-end dari relasi data (mis. Pendaftaran →
-Periksa → SOAP → Resep → Billing) di sidebar + highlight pada graph.
+Periksa → SOAP → Resep → Billing) di sidebar + highlight pada graph. Panel
+**Dokumentasi** (ikon buku di header) menyusun perspektif **C4 Model**, outline
+**arc42**, daftar **ADR** (dari `DECISIONS` opsional), dan panduan **Diátaxis**.
 
 ## Quickstart
 

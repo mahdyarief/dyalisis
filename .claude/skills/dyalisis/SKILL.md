@@ -125,6 +125,17 @@ menyentuh node jadi asosiasi berlabel field. `entity` (opsional) menamai kelas;
 tanpa itu dipakai `label`. Tipe atribut ditebak dari pola nama (ref/date/number/
 string). Tidak perlu konfigurasi tambahan.
 
+**Panel Dokumentasi (`DocsPanel.jsx`):** dibuka dari ikon buku di header. Menyusun
+empat perspektif arsitektur dari data yang sudah ada: **C4 Model** (pemetaan
+L0–L3 → Context/Container/Component/Code + jumlah), **arc42** (outline relevan),
+**ADR** (dari array opsional `DECISIONS`), dan **Diátaxis** (cara menulis
+dokumentasi). `DECISIONS` (opsional) berbentuk `{ title, status, context, decision }`
+dengan `status` salah satu dari `proposed|accepted|rejected|deprecated`.
+
+**Mode Alur:** tombol "Alur" di kanan-bawah kanvas menyorot rantai fitur
+end-to-end dari `DATA_EDGES`; sidebar menampilkan langkah berurutan + field
+penghubung (`via <field>`) dengan navigasi Sebelumnya/Berikutnya.
+
 ## 5. Menambah aplikasi baru (langkah)
 
 1. Salin `src/data/example.js` → `src/data/<app>.js`.
