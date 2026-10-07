@@ -209,6 +209,19 @@ export default function DyalisisApp() {
     setSelectedId(id);
   }, [byIdAll, showActions, query, visibleIds]);
 
+  // Tap pada kanvas: klik latar (id null) membersihkan seleksi sekaligus
+  // melepas mode Alur, supaya fokus jalur tidak menggantung saat pengguna
+  // menutup pilihan dengan klik di luar area. Klik node biasa hanya memindah
+  // seleksi (mode Alur tetap aktif).
+  const handleCanvasSelect = React.useCallback((id) => {
+    if (id == null) {
+      setSelectedId(null);
+      setFlowMode(false);
+    } else {
+      setSelectedId(id);
+    }
+  }, []);
+
   // Center ke node terpilih (dipakai anak/relasi/breadcrumb & tombol Zoom).
   const zoomToNode = React.useCallback((id) => {
     const cy = cyRef;
@@ -321,7 +334,7 @@ export default function DyalisisApp() {
         <main className="relative min-w-0 flex-1">
           <GraphCanvas nodes={filteredNodes} edges={edges} domains={domains} layoutName={layoutName}
             selectedId={selectedId} matchIds={highlightIds} flowPath={graphFlowPath} notedIds={notedIds}
-            theme={theme} onSelect={setSelectedId} onReady={setCyRef} />
+            theme={theme} onSelect={handleCanvasSelect} onReady={setCyRef} />
           <Legend domains={domains} showActions={showActions} flowActive={flowMode && graphFlowPath.length > 1}
             notedCount={notedIds.length} highlight={graphPalette(theme).highlight}
             noteColor={graphPalette(theme).noteColor} />
