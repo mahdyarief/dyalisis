@@ -71,33 +71,14 @@ export default function DyalisisApp() {
 
   const domains = C.DOMAINS || {};
 
-  // ===== Notes per node — jembatan Manusia↔AI =====
-  // Catatan kritis yang tak terlihat di graph (kenapa field ini ada, jebakan
-  // integrasi, aturan bisnis) disimpan per id node. Persisten di localStorage
-  // supaya tetap ada saat file HTML dibuka ulang; seed awal bisa disuplai
-  // content lewat simbol opsional `NOTES` ({ idNode: 'teks' }).
-  const noteStorageKey = `dyalisis:notes:${APP.name}`;
-  const [notes, setNotes] = React.useState(() => {
-    try {
-      const raw = localStorage.getItem(noteStorageKey);
-      if (raw) return JSON.parse(raw);
-    } catch { /* storage tak tersedia — pakai seed saja */ }
-    return { ...(C.NOTES || {}) };
-  });
-  const [noteDraft, setNoteDraft] = React.useState('');
-  const setNote = React.useCallback((id, text) => {
-    setNotes((prev) => {
-      const next = { ...prev };
-      const clean = (text || '').trim();
-      if (clean) next[id] = clean; else delete next[id];
-      try { localStorage.setItem(noteStorageKey, JSON.stringify(next)); } catch { /* abaikan */ }
-      return next;
-    });
-  }, [noteStorageKey]);
-  const notedIds = React.useMemo(() => Object.keys(notes), [notes]);
-
-  // Draft mengikuti node terpilih — saat berpindah node, tampilkan catatan yang ada.
-  React.useEffect(() => { setNoteDraft(notes[selectedId] || ''); }, [selectedId, notes]);
+  // ===== Catatan node — VIEW dari content, bukan penyimpanan =====
+  // Catatan kritis per node (aturan bisnis tak tertulis, jebakan integrasi,
+  // sumber kebenaran data) datang dari simbol opsional `NOTES` di content:
+  // { idNode: 'teks' }. Framework hanya MENAMPILKAN-nya sebagai view — badge
+  // pada node, panel baca-saja di sidebar, hitungan di legenda. Tidak ada input
+  // atau penyimpanan baru; ubah catatan dengan menyunting content lalu build.
+  const notes = C.NOTES || {};
+  const notedIds = Object.keys(notes);
 
   // Semua node + parent (compound nesting): modul ⊂ app, fitur ⊂ modul, aksi ⊂ fitur.
   const allNodes = React.useMemo(() => {
@@ -440,32 +421,20 @@ export default function DyalisisApp() {
                   <IconTarget /> Zoom ke node
                 </Button>
 
-                {/* Notes per node — jembatan Manusia↔AI. Info yang tak terlihat di
-                    graph (alasan bisnis, jebakan integrasi) disimpan per node dan
-                    persisten di localStorage, sehingga bisa dibaca kembali oleh
-                    manusia maupun AI pada sesi berikutnya. */}
-                <div>
-                  <p className="mb-1 flex items-baseline justify-between gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    <span>Catatan node</span>
-                    {notes[selected.id] && <span className="normal-case tracking-normal text-pink-400">tersimpan</span>}
-                  </p>
-                  <textarea
-                    className="w-full resize-y rounded-md border bg-muted/30 px-2 py-1.5 text-xs leading-relaxed outline-none focus:ring-1 focus:ring-ring"
-                    rows={3}
-                    placeholder="Tulis informasi kritis tentang node ini… (mis. aturan bisnis, jebakan integrasi, sumber kebenaran data)"
-                    value={noteDraft}
-                    onChange={(e) => setNoteDraft(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Escape') e.stopPropagation(); }}
-                  />
-                  <div className="mt-1 flex gap-1">
-                    <Button size="sm" variant="secondary" className="flex-1"
-                      disabled={noteDraft.trim() === (notes[selected.id] || '')}
-                      onClick={() => setNote(selected.id, noteDraft)}>Simpan</Button>
-                    {notes[selected.id] && (
-                      <Button size="sm" variant="ghost" onClick={() => { setNote(selected.id, ''); setNoteDraft(''); }}>Hapus</Button>
-                    )}
+                {/* Catatan node — VIEW baca-saja dari content `NOTES`. Info yang
+                    tak terlihat di graph (alasan bisnis, jebakan integrasi)
+                    ditandai di content, lalu tampil di sini apa adanya. Tidak ada
+                    input atau penyimpanan; ubah di content lalu build ulang. */}
+                {notes[selected.id] && (
+                  <div>
+                    <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Catatan node
+                    </p>
+                    <p className="whitespace-pre-wrap rounded-md border border-pink-400/40 bg-pink-400/5 px-2 py-1.5 text-xs leading-relaxed">
+                      {notes[selected.id]}
+                    </p>
                   </div>
-                </div>
+                )}
                 {umlNode && (
                   <UmlDiagram node={umlNode} byId={byIdAll} related={umlRelated}
                     children={umlChildren} domains={domains} theme={theme}

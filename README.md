@@ -28,9 +28,10 @@ Periksa → SOAP → Resep → Billing) di sidebar + highlight pada graph. Node 
 panah berurutan, dan langkah yang sedang dipilih memakai **satu bahasa warna**
 sehingga alur terbaca sebagai satu kesatuan; penanda tiap keadaan dijelaskan di
 legenda. Tiap node juga bisa punya **catatan** (aturan bisnis tak tertulis,
-jebakan integrasi) sebagai jembatan Manusia↔AI — tersimpan di `localStorage`,
-di-seed dari `NOTES` content, ditandai badge pada node, hitungan di legenda, dan
-dot pada daftar langkah Alur. Panel **Dokumentasi** (ikon buku di header)
+jebakan integrasi) sebagai jembatan Manusia↔AI — ditandai di content lewat
+`NOTES` dan ditampilkan sebagai **view baca-saja** (tanpa penyimpanan), dengan
+badge pada node, hitungan di legenda, dan dot pada daftar langkah Alur. Panel
+**Dokumentasi** (ikon buku di header)
 menyusun perspektif **C4 Model**, **arc42** (12 seksi lengkap), daftar **ADR**
 (dari `DECISIONS` opsional), **glosarium** (dari `GLOSSARY` opsional), dan
 **Diátaxis** (artefak nyata dari data). Tiap seksi punya default turunan dari

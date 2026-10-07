@@ -61,8 +61,8 @@ export const GLOSSARY = [
   { term: 'order_id', definition: 'Kunci pesanan yang mengikat Shipment & Invoice.' },
   { term: 'sku', definition: 'Kode stok barang — kunci entitas Inventory.' }
 ];
-// Notes per node (opsional) — seed catatan kritis (jembatan Manusia↔AI).
-// Pengguna dapat menambah/mengubah lewat sidebar "Catatan node" (localStorage).
+// Catatan per node (opsional) — ditampilkan sebagai VIEW baca-saja (jembatan
+// Manusia↔AI). Tandai info kritis di sini; tampil di sidebar + badge pada node.
 export const NOTES = {
   orders: 'Sumber kebenaran status pesanan. Pembatalan tidak menghapus invoice yang sudah terbit — hanya menandai.',
   inventory: 'Stok berkurang dari DUA jalur (shipment & invoice). Selalu uji keduanya saat mengubah logika stok.'

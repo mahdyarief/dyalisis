@@ -175,13 +175,14 @@ prioritas ini pengguna tidak tahu sedang berdiri di langkah mana. Kelas dipakai
 (bukan `:selected`) sebab seleksi bisa datang dari sidebar atau tombol
 Berikutnya, bukan klik pada kanvas.
 
-**Catatan node (jembatan Manusia↔AI):** tiap node bisa menyimpan catatan kritis
-— aturan bisnis tak tertulis, jebakan integrasi, alasan sebuah keputusan. Editor
-ada di sidebar saat sebuah node dipilih (Simpan/Hapus). Catatan tersimpan di
-`localStorage` kunci `dyalisis:notes:${APP.name}` dan **di-seed** dari `NOTES`
-content kalau penyimpanan masih kosong, sehingga kurasi AI/penulis content ikut
-terbawa ke build. Penandanya: badge pie pada node, hitungan di legenda, dan dot
-pada daftar langkah Alur.
+**Catatan node (jembatan Manusia↔AI):** tiap node bisa membawa catatan kritis
+— aturan bisnis tak tertulis, jebakan integrasi, alasan sebuah keputusan — lewat
+simbol opsional `NOTES` (`{ idNode: 'teks' }`). Ini murni **view baca-saja**:
+framework hanya menampilkan informasi yang Anda tandai di content, tanpa input,
+tanpa penyimpanan, tanpa `localStorage`. Untuk mengubahnya, sunting `NOTES` lalu
+build ulang — sehingga kurasi penulis/AI selalu ikut terbawa ke artefak.
+Penandanya: badge pie pada node, hitungan di legenda, dan dot pada daftar
+langkah Alur.
 
 ## 5. Menambah aplikasi baru (langkah)
 
