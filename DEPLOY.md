@@ -22,7 +22,80 @@ Mode auth:
 | Tanpa `DYALISIS_PUBLISH_TOKEN` | **terbuka** — siapa saja boleh publish; `POST /api/register` memberi token (owner = handle). |
 | Dengan `DYALISIS_PUBLISH_TOKEN=<rahasia>` | **tertutup** — publish wajib sertakan token itu; owner diambil dari header `X-Dyalisis-Owner` (default `public`). Registrasi terbuka dimatikan. |
 
-## Reverse proxy + HTTPS (Caddy)
+## Deploy di VPS — Docker (disarankan)
+
+Repo menyertakan `Dockerfile` + `docker-compose.yml` yang meng-install paket
+`dyalisis` dari npm lalu menjalankan `dyalisis serve`. Port di-map ke
+`127.0.0.1` saja (bukan publik) — tunnel yang mengeksposnya.
+
+```bash
+docker compose up -d --build
+docker compose logs -f          # lihat log
+curl -s localhost:8787/health   # { "ok": true }
+```
+
+Isi `docker-compose.yml` penting:
+
+```yaml
+ports:
+  - "127.0.0.1:8787:8787"       # localhost saja
+environment:
+  - DYALISIS_DATA_DIR=/data
+  - DYALISIS_PUBLIC_URL=https://dyalisis.nimb.us.ci
+volumes:
+  - dyalisis-data:/data         # publikasi persist di named volume
+```
+
+Biarkan bind `0.0.0.0` **di dalam** container (perlu agar port mapping
+menjangkau proses); yang melindungi adalah mapping host ke `127.0.0.1`.
+
+## Reverse proxy + HTTPS — Cloudflare Tunnel (dipakai di dyalisis.nimb.us.ci)
+
+Cloudflare Tunnel (`cloudflared`) memberi HTTPS tanpa membuka port apa pun.
+Deploy yang dipakai: container `dyalisis` di `127.0.0.1:8787`, lalu tunnel
+mengarahkan hostname publik ke port lokal itu.
+
+```bash
+# sekali saja
+cloudflared tunnel create dyalisis
+cloudflared tunnel route dns dyalisis dyalisis.nimb.us.ci
+```
+
+`/etc/cloudflared/dyalisis.yml`:
+
+```yaml
+tunnel: <TUNNEL_ID>
+credentials-file: /root/.cloudflared/<TUNNEL_ID>.json
+ingress:
+  - hostname: dyalisis.nimb.us.ci
+    service: http://localhost:8787
+  - service: http_status:404
+```
+
+Unit systemd `cloudflared-dyalisis.service` (mengikuti pola `cloudflared-idrouter.service`):
+
+```ini
+[Unit]
+Description=Cloudflare Tunnel for Dyalisis
+After=network.target
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/cloudflared --config /etc/cloudflared/dyalisis.yml tunnel run
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=multi-user.target
+```
+
+`systemctl enable --now cloudflared-dyalisis`.
+
+> Catatan: `cloudflared tunnel route dns` memakai `zoneID` dari `cert.pem`. Kalau
+> cert dibuat untuk zona lain, record bisa salah zona (mis. muncul
+> `<host>.zona-lain`). Buat record CNAME-nya langsung via Cloudflare API
+> (`type=CNAME, name=<sub>, content=<TUNNEL_ID>.cfargotunnel.com, proxied=true`)
+> di zona yang benar.
+
+## Alternatif non-Docker — Caddy
 
 Caddy menangani TLS otomatis. `Caddyfile`:
 

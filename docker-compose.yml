@@ -1,0 +1,22 @@
+# Dyalisis publish server di VPS — docker compose.
+#   docker compose up -d --build
+# Port di-map ke 127.0.0.1 saja; cloudflared (host, systemd) yang mengekspos
+# dyalisis.nimb.us.ci -> localhost:8787. Container bind 0.0.0.0 (perlu untuk
+# port mapping) tapi tidak pernah terekspos langsung karena mapping localhost.
+services:
+  dyalisis:
+    build: .
+    image: dyalisis:0.1.0
+    container_name: dyalisis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      - DYALISIS_DATA_DIR=/data
+      - DYALISIS_PUBLIC_URL=https://dyalisis.nimb.us.ci
+      # - DYALISIS_PUBLISH_TOKEN=ubah-ini   # opsional: mode token tertutup
+    volumes:
+      - dyalisis-data:/data
+
+volumes:
+  dyalisis-data:

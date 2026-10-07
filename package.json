@@ -24,6 +24,8 @@
     "README.md",
     "CONTRIBUTING.md",
     "DEPLOY.md",
+    "Dockerfile",
+    "docker-compose.yml",
     ".claude/skills"
   ],
   "engines": {
