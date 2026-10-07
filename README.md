@@ -42,7 +42,7 @@ data; content boleh menimpanya lewat `ARC42`/`DOCS`.
 ```bash
 npm install     # postinstall mem-patch bug upstream cytoscape-elk (WAJIB)
 npm run build   # → dist/index.html (demo dari src/data/example.js)
-npm test        # 15 self-check headless
+npm test        # 30 self-check headless
 ```
 
 Buka `dist/index.html` di browser.
@@ -51,7 +51,7 @@ Buka `dist/index.html` di browser.
 
 1. Salin `src/data/example.js` → `src/data/app-anda.js`.
 2. Isi sesuai kontrak (§ Content contract di bawah).
-3. `node test/run.mjs --content src/data/app-anda.js` → harus **15/15 PASS**.
+3. `node test/run.mjs --content src/data/app-anda.js` → harus **30/30 PASS**.
 4. `node build.mjs --content src/data/app-anda.js` → `dist/index.html`.
 
 ## Content contract

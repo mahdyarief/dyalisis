@@ -120,7 +120,7 @@ export const DOCS      = [{ kind: 'How-to', items: ['...'] }];   // artefak Diá
 export const NOTES     = { idNode: 'catatan kritis...' };        // seed catatan per node
 ```
 
-**Aturan struktur yang diuji `npm test`:**
+**Aturan struktur yang diuji `npm test` (30 check):**
 - `id` unik di seluruh node.
 - `parent` tiap node merujuk id yang ada; **tanpa siklus**.
 - `MODULES[i].id` **harus** `mod-<domain>` — engine menurunkan parent fitur dari
@@ -128,6 +128,14 @@ export const NOTES     = { idNode: 'catatan kritis...' };        // seed catatan
 - Tiap modul punya ≥1 fitur; tiap fitur punya ≥1 aksi.
 - `LEVELS` konsisten dengan panjang `MODULES`/`NODES`/`ACTIONS`; `levelOf` benar.
 - Semua `domain` node/aksi terdaftar di `DOMAINS`.
+- `DATA_EDGES` kedua ujungnya menunjuk node nyata; kunci `NOTES` menunjuk node nyata.
+- `buildActivePath()` (jalur Alur) menguji langsung fungsi engine: langkah pertama
+  = start, tiap langkah terhubung `DATA_EDGES`, tanpa node berulang, selektif
+  (bukan seluruh graph), `branches` memuat semua successor, dan `branchChoice`
+  benar-benar mengubah cabang.
+- Bahasa visual diuji lewat resolusi selector cytoscape: `node.flow` border =
+  `highlight`, `node.anchor` menang atas `flow`, `edge.chain` lebih tebal dari
+  edge biasa, `node.noted` memakai `pie-1-background-size` kecil.
 
 **UML class diagram (otomatis dari data):** komponen `UmlDiagram.jsx` mengubah
 `fields` (CSV) jadi atribut kelas, anak node jadi operasi, dan `DATA_EDGES` yang
@@ -152,15 +160,17 @@ dihitung dari data, lalu content boleh menimpa lewat simbol opsional.
   **artefak nyata** diturunkan dari data (modul awal, fitur+route, katalog field,
   relasi data); content dapat menimpanya lewat `DOCS: [{ kind, items }]`.
 
-**Mode Alur:** tombol "Alur" di kanan-bawah kanvas menyorot sub-grafik relasi
-data end-to-end dari `DATA_EDGES`. `buildFlow()` menelusuri **semua cabang** —
-seluruh node hulu (yang punya jalur menuju fitur terpilih) + fitur itu + seluruh
-node hilir (yang dicapai darinya) — lalu mengurutkannya secara topologis. Sidebar
-menampilkan daftar langkah itu: field penghubung masuk (`↳ via <field>`, bisa
-lebih dari satu) dan badge `⇉N` pada langkah yang punya N cabang keluar. (Versi
-lama menelusuri greedy satu cabang saja, sehingga percabangan seperti
-`orders → invoices` **dan** `orders → shipments` tak terlihat.) Navigasi
-Sebelumnya/Berikutnya mengikuti urutan topologis tersebut.
+**Mode Alur:** tombol "Alur" di kanan-bawah kanvas menyorot **satu jalur aktif**
+dari fitur terpilih menuju hilir. `buildActivePath()` (src/lib/flow.js) sengaja
+tidak menyorot seluruh sub-grafik: pada graph kecil, seluruh node hulu+hilir
+hampir menyalakan semua node (terukur ~92% pada example.js), sehingga highlight
+kehilangan makna. Alih-alih, framework menelusuri satu jalur; di tiap
+percabangan beda, sidebar menampilkan pemilih cabang (`⇉ cabang: A | B`) yang
+bisa diganti user — pemilihan disimpan di state `branchChoice` dan jalur
+dihitung ulang. Titik start (`flowStart`) terpisah dari langkah aktif
+(`selectedId`), sehingga mengklik langkah lain hanya memindahkan penanda, bukan
+mengubah root jalur. Node di luar jalur tetap redup tapi terlihat, jadi cabang
+alternatif tersedia tanpa membanjiri kanvas.
 
 Bahasa visualnya satu warna: node jalur **dan** panah sama-sama memakai warna
 `highlight` dari palet tema, jadi jalur terbaca sebagai satu kesatuan — bukan
@@ -169,7 +179,7 @@ Bahasa visualnya satu warna: node jalur **dan** panah sama-sama memakai warna
 | Kelas | Arti | Penanda visual |
 |---|---|---|
 | `node.flow` | node ikut jalur Alur | border warna `highlight`, tebal 4, label bold |
-| `edge.chain` | edge yang **kedua ujungnya** di jalur Alur | tebal 3.5, panah 1.5×, warna `highlight` |
+| `edge.chain` | edge **antar-langkah berurutan** di jalur aktif | tebal 3.5, panah 1.5×, warna `highlight` |
 | `node.anchor` | langkah yang **sedang dipilih** | border putih (5) + halo underlay |
 | `node.noted` | node punya catatan | irisan pie `noteColor` di sudut node |
 | `node.match` / `.faded` | hasil pencarian / di luar konteks | border amber / opacity turun |
@@ -196,7 +206,7 @@ langkah Alur.
 2. Isi `APP`, `DOMAINS` (label + warna), `ROOT`, `MODULES`, `NODES`, lalu
    `ACTION_DEFS` (map `idFitur → [label aksi...]`) dan turunkan `ACTIONS`.
 3. Tulis `DATA_EDGES` = relasi data antar-fitur `[dari, ke, field_kunci]`.
-4. Jalankan `node test/run.mjs --content src/data/<app>.js` → harus 15/15 PASS.
+4. Jalankan `node test/run.mjs --content src/data/<app>.js` → harus 30/30 PASS.
 5. `node build.mjs --content src/data/<app>.js` → `dist/index.html`.
 
 **Tips model:** domain = kelompok fungsional (bukan tim). Fitur = fungsi utama

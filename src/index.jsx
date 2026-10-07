@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { Button, Card, CardContent, Badge, Input } from './components/ui.jsx';
 import { LAYOUT_DEFS, DEFAULT_LAYOUT } from './lib/layouts.js';
 import { graphPalette } from './lib/graph-style.js';
+import { buildActivePath } from './lib/flow.js';
 import { cn } from './lib/utils.js';
 import GraphCanvas from './components/GraphCanvas.jsx';
 import Legend from './components/Legend.jsx';
@@ -18,72 +19,6 @@ import * as C from './content.js';
 
 const APP = C.APP || { name: 'Dyalisis', subtitle: 'Feature Analysis Graph' };
 
-// Bangun sub-grafik Alur end-to-end dari DATA_EDGES — SEMUA cabang, bukan satu
-// jalur greedy. Kumpulkan node hulu (yang punya jalur menuju start) + start +
-// node hilir (yang dicapai dari start); edge yang kedua ujungnya termasuk
-// dianggap bagian alur. Urutan langkahnya topologis (paling hulu dulu), jadi
-// percabangan seperti orders → invoices DAN orders → shipments tetap terlihat.
-function buildFlow(startId, dataEdges) {
-  const edges = dataEdges || [];
-  const outMap = {};
-  const inMap = {};
-  edges.forEach(([s, t]) => {
-    (outMap[s] = outMap[s] || []).push(t);
-    (inMap[t] = inMap[t] || []).push(s);
-  });
-
-  // Hulu: telusuri mundur dari start lewat inMap.
-  const up = new Set();
-  const upStack = [startId];
-  while (upStack.length) {
-    const cur = upStack.pop();
-    for (const from of inMap[cur] || []) {
-      if (from !== startId && !up.has(from)) { up.add(from); upStack.push(from); }
-    }
-  }
-  // Hilir: telusuri maju dari start lewat outMap.
-  const down = new Set();
-  const downStack = [startId];
-  while (downStack.length) {
-    const cur = downStack.pop();
-    for (const to of outMap[cur] || []) {
-      if (to !== startId && !down.has(to)) { down.add(to); downStack.push(to); }
-    }
-  }
-  const nodeSet = new Set([...up, startId, ...down]);
-
-  // Edge alur: kedua ujungnya termasuk sub-grafik.
-  const flowEdges = edges.filter(([s, t]) => nodeSet.has(s) && nodeSet.has(t));
-
-  // Urutan topologis (Kahn) memakai edge alur; node bersisa disusul apa adanya
-  // (mis. bagian siklik yang derajat-masuknya tak pernah nol).
-  const indeg = {};
-  nodeSet.forEach((id) => { indeg[id] = 0; });
-  flowEdges.forEach(([, t]) => { indeg[t] = (indeg[t] || 0) + 1; });
-  const outFlow = {};
-  flowEdges.forEach(([s, t]) => { (outFlow[s] = outFlow[s] || []).push(t); });
-  const order = [];
-  const seen = new Set();
-  let layer = [...nodeSet].filter((id) => !indeg[id]);
-  if (!layer.length) layer = [startId];
-  while (layer.length) {
-    const next = [];
-    for (const id of layer) {
-      if (seen.has(id)) continue;
-      seen.add(id);
-      order.push(id);
-      for (const t of outFlow[id] || []) {
-        indeg[t]--;
-        if (indeg[t] <= 0 && !seen.has(t)) next.push(t);
-      }
-    }
-    layer = next;
-  }
-  nodeSet.forEach((id) => { if (!seen.has(id)) order.push(id); });
-
-  return { nodes: order, edges: flowEdges, startId };
-}
-
 export default function DyalisisApp() {
   const [layoutName, setLayoutName] = React.useState(DEFAULT_LAYOUT);
   const [selectedId, setSelectedId] = React.useState(null);
@@ -94,6 +29,8 @@ export default function DyalisisApp() {
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
   const [layoutMenuOpen, setLayoutMenuOpen] = React.useState(false);
   const [flowMode, setFlowMode] = React.useState(false);
+  const [flowStart, setFlowStart] = React.useState(null);       // fitur awal jalur Alur
+  const [branchChoice, setBranchChoice] = React.useState({});   // { nodeId: successorId }
   const [docsOpen, setDocsOpen] = React.useState(false);
   const searchRef = React.useRef(null);
   const layoutMenuRef = React.useRef(null);
@@ -207,25 +144,46 @@ export default function DyalisisApp() {
     [umlNode, allNodes]
   );
 
-  // Mode Alur: dari fitur terpilih, susun sub-grafik relasi data end-to-end
-  // (SEMUA cabang, bukan satu jalur greedy). Lihat buildFlow().
+  // Mode Alur: susun SATU jalur aktif dari fitur start menuju hilir — selektif,
+  // bukan sub-grafik penuh (yang di graph kecil menyalakan hampir semua node,
+  // sampai highlight tak bermakna). Percabangan diselesaikan lewat branchChoice;
+  // lihat buildActivePath() di src/lib/flow.js.
   const flow = React.useMemo(() => {
-    if (!flowMode || !selected || selected.type !== 'feature') return { nodes: [], edges: [] };
-    return buildFlow(selected.id, C.DATA_EDGES || []);
-  }, [flowMode, selected]);
-  const flowPath = flow.nodes;
+    if (!flowMode || !flowStart) return { path: [], edges: [], branches: {} };
+    return buildActivePath(flowStart, C.DATA_EDGES || [], branchChoice);
+  }, [flowMode, flowStart, branchChoice]);
+  const flowPath = flow.path;
 
-  // Peta field masuk & jumlah cabang keluar per node, untuk label daftar Alur.
+  // Field penghubung masuk per langkah (jalur linear → tiap langkah satu field).
   const flowIncoming = React.useMemo(() => {
     const m = {};
-    flow.edges.forEach(([, t, f]) => { (m[t] = m[t] || []).push(f); });
+    flow.edges.forEach(([, t, f]) => { if (f) m[t] = f; });
     return m;
   }, [flow]);
-  const flowOutgoing = React.useMemo(() => {
-    const m = {};
-    flow.edges.forEach(([s]) => { m[s] = (m[s] || 0) + 1; });
-    return m;
-  }, [flow]);
+
+  // Aktifkan Alur: kunci titik start dari fitur terpilih, reset pilihan cabang.
+  const toggleFlow = React.useCallback(() => {
+    if (!flowMode) {
+      setFlowStart(selected && selected.type === 'feature' ? selected.id : null);
+      setBranchChoice({});
+    }
+    setFlowMode((v) => !v);
+  }, [flowMode, selected]);
+
+  // Ganti cabang di satu titik percabangan → jalur dihitung ulang.
+  const selectBranch = React.useCallback((nodeId, successorId) => {
+    setBranchChoice((prev) => ({ ...prev, [nodeId]: successorId }));
+  }, []);
+
+  // Saat Alur aktif: memilih fitur DI LUAR jalur memindahkan titik start ke
+  // fitur itu; memilih langkah yang sudah ada di jalur hanya memindahkan
+  // penanda langkah aktif (tidak menghitung ulang dari langkah itu).
+  React.useEffect(() => {
+    if (!flowMode || !selected || selected.type !== 'feature') return;
+    if (!flowStart) { setFlowStart(selected.id); return; }
+    if (!flowPath.includes(selected.id)) setFlowStart(selected.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, flowMode]);
 
   // Set node yang di-highlight di graph: pencarian menang, lalu mode Alur.
   const highlightIds = React.useMemo(() => {
@@ -374,7 +332,7 @@ export default function DyalisisApp() {
           {/* Klaster mode: layout + tampilan Aksi (L3) — kontekstual ke kanvas. */}
           <div ref={layoutMenuRef} className="absolute bottom-3 right-3 z-10 flex items-center gap-2">
             <Button size="sm" variant={flowMode ? 'default' : 'outline'} className="gap-1 shadow"
-              title="Tampilkan jalur alur data end-to-end dari fitur terpilih" onClick={() => setFlowMode((v) => !v)}>
+              title="Tampilkan jalur alur data end-to-end dari fitur terpilih" onClick={toggleFlow}>
               {flowMode && <IconCheck className="h-3.5 w-3.5" />} Alur
             </Button>
             <Button size="sm" variant={showActions ? 'default' : 'outline'} className="gap-1 shadow"
@@ -517,29 +475,40 @@ export default function DyalisisApp() {
                 {flowMode && flowPath.length > 1 && (
                   <div>
                     <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Alur End-to-End ({flowPath.length} langkah)
+                      Alur — jalur aktif ({flowPath.length} langkah)
                     </p>
                     <div className="space-y-1">
                       {flowPath.map((id, i) => {
                         const n = byIdAll[id];
-                        const inFields = flowIncoming[id] || [];
-                        const outs = flowOutgoing[id] || 0;
+                        const inField = flowIncoming[id];
+                        const branches = flow.branches[id] || [];
                         return (
                           <React.Fragment key={id}>
-                            {inFields.length > 0 && (
-                              <p className="pl-6 text-[9px] italic text-muted-foreground">↳ via {inFields.join(', ')}</p>
+                            {inField && (
+                              <p className="pl-6 text-[9px] italic text-muted-foreground">↳ via {inField}</p>
                             )}
                             <button className={cn('flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-muted',
                               id === selectedId && 'bg-muted font-medium')}
                               onClick={() => selectNode(id)}>
                               <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] text-muted-foreground">{i + 1}</span>
                               <span className="flex-1 truncate">{n ? n.label : id}</span>
-                              {outs > 1 && (
-                                <span className="shrink-0 rounded bg-amber-500/15 px-1 text-[9px] font-semibold text-amber-600 dark:text-amber-400"
-                                  title={`${outs} cabang keluar`}>⇉{outs}</span>
-                              )}
                               {notes[id] && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-pink-400" title="punya catatan" />}
                             </button>
+                            {branches.length > 1 && (
+                              <div className="flex flex-wrap items-center gap-1 pl-6">
+                                <span className="text-[9px] text-muted-foreground">cabang:</span>
+                                {branches.map((b) => (
+                                  <button key={b}
+                                    className={cn('rounded px-1.5 py-0.5 text-[10px]',
+                                      flowPath[i + 1] === b
+                                        ? 'bg-foreground text-background font-medium'
+                                        : 'bg-muted text-muted-foreground hover:bg-muted/70')}
+                                    onClick={() => selectBranch(id, b)}>
+                                    {byIdAll[b] ? byIdAll[b].label : b}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </React.Fragment>
                         );
                       })}

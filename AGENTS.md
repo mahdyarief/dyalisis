@@ -9,7 +9,7 @@ Repo ini adalah **Dyalisis**, framework visualisasi feature-analysis. Kalau Anda
 ```bash
 npm install                              # WAJIB: postinstall mem-patch bug cytoscape-elk
 npm run build                            # → dist/index.html (pakai src/data/example.js)
-npm test                                 # 15 self-check headless, harus hijau
+npm test                                 # 30 self-check headless, harus hijau
 node build.mjs --content <file.js>       # build aplikasi tertentu
 node test/run.mjs --content <file.js>    # uji content tertentu
 ```
@@ -18,7 +18,7 @@ node test/run.mjs --content <file.js>    # uji content tertentu
 
 1. Pelajari aplikasi target → susun hierarki 4 level: Aplikasi → Modul → Fitur → Aksi.
 2. Salin `src/data/example.js` → `src/data/<app>.js`; isi sesuai kontrak (SKILL.md §4).
-3. `node test/run.mjs --content src/data/<app>.js` → perbaiki sampai **15/15 PASS**.
+3. `node test/run.mjs --content src/data/<app>.js` → perbaiki sampai **30/30 PASS**.
 4. `node build.mjs --content src/data/<app>.js` → hasilkan `dist/index.html`.
 
 ## Konvensi yang tidak boleh dilanggar

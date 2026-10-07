@@ -31,13 +31,15 @@ export function toElements(nodes, edges, domains = {}) {
   };
 }
 
-/** Tandai edge yang kedua ujungnya ada di jalur Alur (semua cabang, bukan
- *  hanya berurutan indeks) — garis lebih tebal, panah lebih besar, agar
- *  jalur terbaca sebagai satu kesatuan, bukan sekadar "semua menyala". */
+/** Tandai edge antar-langkah berurutan pada jalur Alur aktif (garis lebih
+ *  tebal, panah lebih besar) agar arah alur terbaca. Jalur aktif linear, jadi
+ *  adjacency indeks tepat; edge menuju cabang alternatif tidak ikut menyala. */
 function markChainEdges(cy, flowPath) {
-  const ids = new Set(flowPath);
+  const pos = new Map(flowPath.map((id, i) => [id, i]));
   cy.edges().forEach((e) => {
-    if (ids.has(e.data('source')) && ids.has(e.data('target'))) e.addClass('chain');
+    const s = pos.get(e.data('source'));
+    const t = pos.get(e.data('target'));
+    if (s !== undefined && t !== undefined && Math.abs(s - t) === 1) e.addClass('chain');
   });
 }
 
@@ -133,11 +135,12 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
           matched = matched.union(n);
         }
       });
-      // keep hanya berisi node — keep.edges() selalu kosong. Ambil edge yang
-      // kedua ujungnya (source & target) ada di keep, PLUS semua edge yang
-      // menyentuh node alur (matched) — termasuk panah yang masuk dari luar
-      // container — agar head arrow-nya ikut berwarna, bukan tersisa garis pudar.
-      const keepEdges = keep.edgesWith(keep).union(matched.connectedEdges());
+      // Mode Alur: hanya edge DI jalur aktif yang terang. Edge menuju cabang
+      // alternatif (di luar jalur) sengaja tidak di-highlight agar redup —
+      // supaya alur terbaca sebagai satu jalur, bukan banjir edge menyala.
+      const keepEdges = flowActive
+        ? keep.edgesWith(keep)
+        : keep.edgesWith(keep).union(matched.connectedEdges());
       cy.elements().not(keep).not(keepEdges).addClass('faded');
       matched.addClass('match');
       // Aksi (L3) milik fitur yang ter-highlight juga disorot.

@@ -29,6 +29,10 @@ const contentArg = flagValue('--content');
 const CONTENT = contentArg ? resolve(REPO, contentArg) : resolve(REPO, 'src/data/example.js');
 const C = await import(pathToFileURL(CONTENT).href);
 
+// Fungsi engine asli (bukan replika) — buildActivePath & style dipakai engine.
+const { buildActivePath } = await import(pathToFileURL(resolve(REPO, 'src/lib/flow.js')).href);
+const { buildGraphStyle, graphPalette } = await import(pathToFileURL(resolve(REPO, 'src/lib/graph-style.js')).href);
+
 // Registrasi extensions (dagre/elk export berupa fungsi register).
 for (const ext of [dagre, elk]) {
   if (typeof ext === 'function') ext(cytoscape);
@@ -147,6 +151,87 @@ function spread(cy) {
   });
   check('elk+compound menghasilkan posisi', spread(cy));
   check(`kotak modul (${sampleModule}) membungkus fiturnya (elk)`, outside.length === 0);
+}
+
+// ===== 5. Relasi data & catatan menunjuk node nyata =====
+check('DATA_EDGES: kedua ujung menunjuk node valid',
+  DATA_EDGES.every(([s, t]) => byId[s] && byId[t]));
+const NOTES = C.NOTES || {};
+check('NOTES: kunci menunjuk node valid', Object.keys(NOTES).every((id) => byId[id]));
+
+// ===== 6. Jalur Alur aktif (buildActivePath) =====
+// Content-agnostic: target dipilih dari data, bukan hardcode id aplikasi.
+const outCount = {};
+DATA_EDGES.forEach(([s]) => { outCount[s] = (outCount[s] || 0) + 1; });
+const branchNode = Object.keys(outCount).find((id) => outCount[id] > 1);
+const flowStart = Object.keys(outCount)[0] || NODES[0].id;
+{
+  const base = buildActivePath(flowStart, DATA_EDGES, {});
+  check('buildActivePath: start jadi langkah pertama', base.path[0] === flowStart);
+  check('buildActivePath: tiap langkah dihubungkan edge DATA_EDGES',
+    base.edges.every(([s, t]) => DATA_EDGES.some(([ds, dt]) => ds === s && dt === t)));
+  check('buildActivePath: tanpa node berulang', new Set(base.path).size === base.path.length);
+  check('buildActivePath: panjang jalur = jumlah edge + 1', base.path.length === base.edges.length + 1);
+  // Jalur selektif: tanpa cabang, jumlah langkah < jumlah seluruh fitur.
+  check('buildActivePath: selektif (bukan seluruh graph)',
+    base.path.length < allNodes.length, `${base.path.length}/${allNodes.length}`);
+
+  if (branchNode) {
+    const succ = DATA_EDGES.filter(([s]) => s === branchNode).map(([, t]) => t);
+    const b = buildActivePath(branchNode, DATA_EDGES, {});
+    check('buildActivePath: branches memuat semua successor',
+      (b.branches[branchNode] || []).length === succ.length, JSON.stringify(b.branches));
+    // Pilih successor KEDUA → jalur harus lewat successor itu.
+    const alt = succ[1];
+    const chosen = buildActivePath(branchNode, DATA_EDGES, { [branchNode]: alt });
+    check('buildActivePath: branchChoice mengubah cabang', chosen.path[1] === alt, chosen.path.join(','));
+  }
+}
+
+// ===== 7. Bahasa visual mode Alur & catatan (resolve selector) =====
+const rgb = (hex) => {
+  const h = String(hex).replace('#', '');
+  return `rgb(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)})`;
+};
+const num = (v) => parseFloat(v);
+function buildStyled(theme) {
+  return cytoscape({
+    headless: true, styleEnabled: true, style: buildGraphStyle(theme),
+    elements: [
+      ...visible.map((n) => ({ data: { id: n.id, label: n.label, domain: n.domain, type: n.type, parent: n.parent, color: (DOMAINS[n.domain] || {}).color || '#94a3b8' } })),
+      ...dataEdges.map(([s, t, f], i) => ({ data: { id: 'e' + i, source: s, target: t, field: f } }))
+    ]
+  });
+}
+{
+  const pal = graphPalette('dark');
+  const feats = visible.filter((n) => n.type === 'feature');
+  const anchorId = feats[0].id;
+  const flowOnlyId = (feats[1] && feats[1].id) || sampleModule;
+  const cy = buildStyled('dark');
+  cy.getElementById(flowOnlyId).addClass('match flow');
+  cy.getElementById(anchorId).addClass('match flow anchor');
+  const sf = cy.getElementById(flowOnlyId).style();
+  const sa = cy.getElementById(anchorId).style();
+  check('kelas flow: border = warna highlight', sf['border-color'] === rgb(pal.highlight), sf['border-color']);
+  check('kelas anchor: border = selectedBorder (menang atas flow)', sa['border-color'] === rgb(pal.selectedBorder), sa['border-color']);
+  check('kelas anchor: border lebih tebal dari flow', num(sa['border-width']) > num(sf['border-width']), `${sa['border-width']} vs ${sf['border-width']}`);
+}
+{
+  const cy = buildStyled('dark');
+  const chain = cy.edges()[0];
+  const plainWidth = num(cy.edges()[1].style()['width']);
+  chain.addClass('highlight chain');
+  check('kelas chain: lebih tebal dari edge biasa', num(chain.style()['width']) > plainWidth, `${chain.style()['width']} vs ${plainWidth}`);
+}
+{
+  const pal = graphPalette('dark');
+  const cy = buildStyled('dark');
+  const n = cy.getElementById(sampleFeature.id);
+  n.addClass('noted');
+  const s = n.style();
+  check('kelas noted: pakai noteColor (pie)', s['pie-1-background-color'] === rgb(pal.noteColor), String(s['pie-1-background-color']));
+  check('kelas noted: irisan pie kecil (<50%)', num(s['pie-1-background-size']) < 50, String(s['pie-1-background-size']));
 }
 
 console.log(failures === 0 ? '\nAll tests passed.' : `\n${failures} test(s) failed.`);
