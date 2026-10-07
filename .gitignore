@@ -1,7 +1,7 @@
 # Dependencies & build artifacts
 node_modules/
 dist/
-src/content.js
+.dyalisis-tmp/
 
 # Content aplikasi — framework hanya mengirim example.js (demo generik).
 # Semua file data lain diabaikan; pemakai repo menambahkan datanya sendiri.

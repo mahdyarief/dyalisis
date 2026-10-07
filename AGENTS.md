@@ -1,37 +1,50 @@
 # AGENTS.md — panduan untuk AI Agent
 
-Repo ini adalah **Dyalisis**, framework visualisasi feature-analysis. Kalau Anda
-(agent) diberi link repo ini dan diminta memvisualisasikan fitur sebuah aplikasi,
-**baca `.claude/skills/dyalisis/SKILL.md`** — itu kontrak lengkapnya. Ringkas:
+**Dyalisis** adalah framework visualisasi feature-analysis yang dipakai lewat npm.
+Kalau Anda (agent) diminta memvisualisasikan fitur sebuah aplikasi, alurnya:
+scaffold proyek content → sunting `dyalisis.content.js` → test → build. Kontrak
+lengkapnya ada di **`.claude/skills/dyalisis/SKILL.md`** — baca itu dulu.
 
 ## Perintah kunci
 
 ```bash
-npm install                              # WAJIB: postinstall mem-patch bug cytoscape-elk
-npm run build                            # → dist/index.html (pakai src/data/example.js)
-npm test                                 # 30 self-check headless, harus hijau
-node build.mjs --content <file.js>       # build aplikasi tertentu
-node test/run.mjs --content <file.js>    # uji content tertentu
+npx dyalisis init <nama-app>   # scaffold proyek content baru (folder + stub)
+npx dyalisis test              # 30 self-check headless, harus hijau
+npx dyalisis build             # → dist/index.html (single-file, offline)
 ```
+
+Di repo engine ini sendiri (dev), `npm run build` / `npm test` setara; engine &
+content di repo ini memakai `src/data/example.js` sebagai demo.
 
 ## Alur kerja agent
 
 1. Pelajari aplikasi target → susun hierarki 4 level: Aplikasi → Modul → Fitur → Aksi.
-2. Salin `src/data/example.js` → `src/data/<app>.js`; isi sesuai kontrak (SKILL.md §4).
-3. `node test/run.mjs --content src/data/<app>.js` → perbaiki sampai **30/30 PASS**.
-4. `node build.mjs --content src/data/<app>.js` → hasilkan `dist/index.html`.
+2. `npx dyalisis init <app>` → isi `dyalisis.content.js` sesuai kontrak (SKILL.md §4).
+3. `npx dyalisis test` → perbaiki sampai **30/30 PASS**.
+4. `npx dyalisis build` → hasilkan `dist/index.html`.
 
 ## Konvensi yang tidak boleh dilanggar
 
 - `MODULES[i].id` **harus** `mod-<domain>` (engine menurunkan parent fitur dari `mod-${domain}`).
 - Tiap modul punya ≥1 fitur; tiap fitur punya ≥1 aksi; semua `domain` terdaftar di `DOMAINS`.
-- Jangan commit data aplikasi — `.gitignore` hanya meloloskan `src/data/example.js`.
+- **Notes adalah view baca-saja** dari content `NOTES` — tak ada penyimpanan/editor.
 
 ## Gotcha
 
-- **Jangan hapus `scripts/patch-elk.mjs`** — tanpa itu layout ELK mati saat ada compound node.
+- **Patch cytoscape-elk**: bug upstream mematikan layout ELK saat ada compound node;
+  `lib/patch-elk.mjs` mem-patch saat `build`/`test` (lazy, aman untuk npm hoisting).
+  Tidak ada `postinstall`.
+- Content proyek di-alias lewat esbuild (`@dyalisis/content`) — paket tetap read-only,
+  tidak ada file generated yang ditulis ke `node_modules`.
 - `hierarchyHandling:'INCLUDE_CHILDREN'` harus di dalam `options.elk{}` (bukan level atas).
 - ELK asinkron: tunggu event `layoutstop` sebelum baca posisi (lihat `test/run.mjs`).
-- `npm install` ulang perlu, karena `postinstall` mem-patch `node_modules`.
 
-Dokumentasi penuh: [`.claude/skills/dyalisis/SKILL.md`](.claude/skills/dyalisis/SKILL.md).
+## Dua mode agent
+
+| Mode | Untuk | Baca |
+|---|---|---|
+| **Usage** | memvisualisasikan fitur sebuah aplikasi (konsumen paket) | `.claude/skills/dyalisis/SKILL.md` |
+| **Contribute** | mengembangkan/meningkatkan engine Dyalisis sendiri | `.claude/skills/dyalisis-contribute/SKILL.md` + [`CONTRIBUTING.md`](CONTRIBUTING.md) |
+
+Dokumentasi usage lengkap: [`.claude/skills/dyalisis/SKILL.md`](.claude/skills/dyalisis/SKILL.md).
+Panduan kontribusi (manusia + agent): [`CONTRIBUTING.md`](CONTRIBUTING.md).

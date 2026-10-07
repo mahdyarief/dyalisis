@@ -1,12 +1,36 @@
 {
   "name": "dyalisis",
   "version": "0.1.0",
-  "description": "Reusable feature-analysis visualization engine (Cytoscape.js + shadcn/ui) — flow/flowchart/UML/node-flow for app documentation. Compiled to single self-contained HTML. Engine & content detachable. Framework: Dyalisis.",
+  "description": "Feature-analysis visualization engine (Cytoscape.js + shadcn/ui) — flow/flowchart/UML/node-flow for app documentation. Compiled to single self-contained HTML. Engine & content detachable. Framework: Dyalisis.",
   "type": "module",
+  "bin": {
+    "dyalisis": "bin/dyalisis.mjs"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "build.mjs",
+    "scripts",
+    "src/components",
+    "src/lib",
+    "src/index.jsx",
+    "src/styles.css",
+    "src/data/example.js",
+    "test",
+    "template.html",
+    "tailwind.config.js",
+    "AGENTS.md",
+    "README.md",
+    "CONTRIBUTING.md",
+    ".claude/skills"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "build": "node build.mjs",
-    "test": "node test/run.mjs",
-    "postinstall": "node scripts/patch-elk.mjs"
+    "build": "node bin/dyalisis.mjs build",
+    "test": "node bin/dyalisis.mjs test",
+    "patch-elk": "node scripts/patch-elk.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.1.1",
@@ -17,13 +41,11 @@
     "cytoscape-elk": "^1.1.0",
     "cytoscape-popper": "^2.0.0",
     "elkjs": "^0.9.3",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "tailwind-merge": "^2.5.4"
-  },
-  "devDependencies": {
     "esbuild": "^0.24.2",
     "postcss": "^8.4.49",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.5.4",
     "tailwindcss": "^3.4.17"
   }
 }

@@ -1,9 +1,9 @@
 ---
 name: dyalisis
-description: Framework visualisasi feature-analysis reusable — engine Cytoscape.js + shadcn/ui (React) + Tailwind yang di-compile esbuild menjadi SATU file HTML mandiri. Engine & content terpisah: ganti src/data/*.js untuk aplikasi apa pun. Hierarki 4 level (Aplikasi → Modul → Fitur → Aksi) sebagai compound boundary boxes (C4-style), layout Dagre/ELK/Breadthfirst/Circle/Grid, sidebar detail, seleksi compound-aware. Gunakan saat diminta memvisualisasikan fitur/daftar fitur aplikasi, flow aplikasi, node-flow, atau membangun diagram hierarki fungsional dari sebuah codebase/aplikasi.
+description: Framework visualisasi feature-analysis — engine Cytoscape.js + shadcn/ui (React) + Tailwind yang di-compile esbuild menjadi SATU file HTML mandiri. Dipakai lewat npm (`npx dyalisis init`): engine tetap read-only di paket, content hidup di proyek pemakai sebagai dyalisis.content.js. Hierarki 4 level (Aplikasi → Modul → Fitur → Aksi) sebagai compound boundary boxes (C4-style), layout Dagre/ELK/Breadthfirst/Circle/Grid, sidebar detail, seleksi compound-aware. Gunakan saat diminta memvisualisasikan fitur/daftar fitur aplikasi, flow aplikasi, node-flow, atau membangun diagram hierarki fungsional dari sebuah codebase/aplikasi.
 ---
 
-# Dyalisis — Reusable Feature-Analysis Visualization Framework
+# Dyalisis — Feature-Analysis Visualization Framework
 
 Dyalisis mengubah daftar fitur sebuah aplikasi menjadi **satu file HTML interaktif
 mandiri** (tanpa server, tanpa CDN saat runtime). Node aplikasi disusun sebagai
@@ -35,41 +35,45 @@ Tiap level diturunkan dari level di atasnya (parent/child → compound node).
 
 ```
 dyalisis/
-├── build.mjs              # bundler: source modular → dist/index.html
+├── bin/dyalisis.mjs       # CLI: init / build / test (shebang, dipasang via `bin`)
+├── build.mjs              # bundler engine+content → dist/index.html (juga library)
+├── lib/
+│   ├── scaffold.mjs       # scaffolder proyek content (`dyalisis init`)
+│   └── patch-elk.mjs      # patch bug upstream cytoscape-elk (lazy, lihat §7)
 ├── template.html          # shell HTML (placeholder CSS/JS/title)
 ├── tailwind.config.js
-├── package.json           # build, test, postinstall
+├── package.json           # bin, files, engines, deps (build/test via bin)
 ├── src/
 │   ├── index.jsx          # React app: data → elemen cytoscape, toolbar, sidebar
-│   ├── content.js         # GENERATED oleh build.mjs (re-export content)
 │   ├── styles.css         # Tailwind + CSS vars shadcn (tema dark)
 │   ├── components/        # GraphCanvas.jsx (cytoscape) + ui/* (shadcn-style)
 │   ├── lib/layouts.js     # preset layout + applyLayout()
+│   ├── lib/flow.js        # buildActivePath() untuk Mode Alur
 │   └── data/
 │       └── example.js     # CONTENT demo generik (di-ship bersama framework)
-├── scripts/patch-elk.mjs  # patch bug upstream cytoscape-elk (lihat §7)
-└── test/run.mjs           # self-test headless (integritas, compound, layout)
+└── test/run.mjs           # self-test headless (integritas, compound, layout, flow)
 ```
 
-**Engine vs content terpisah total.** Engine (semua kecuali `src/data/*.js`) tidak
-tahu aplikasi apa pun. Untuk aplikasi baru, cukup tambah satu file content.
+**Engine vs content terpisah total.** Engine (semua kecuali content) tidak tahu
+aplikasi apa pun. Paket ini read-only: content proyek pemakai
+(`./dyalisis.content.js`) di-alias lewat esbuild (`@dyalisis/content`) saat build,
+jadi tidak ada file generated yang ditulis ke `node_modules`.
 
 ## 3. Quickstart
 
-```bash
-npm install          # postinstall menjalankan patch-elk otomatis
-npm run build        # → dist/index.html (memakai src/data/example.js)
-npm test             # self-test headless
-```
-
-Untuk aplikasi nyata:
+Dipakai sebagai framework npm — scaffold proyek content baru:
 
 ```bash
-node build.mjs --content src/data/nama-app.js
-node test/run.mjs --content src/data/nama-app.js
+npx dyalisis init aplikasi-saya   # folder proyek + dyalisis.content.js (stub)
+cd aplikasi-saya
+npm install
+npx dyalisis test                 # 30 self-check headless → semua PASS
+npx dyalisis build                # → dist/index.html (single-file, offline)
 ```
 
-`--out ./somewhere/index.html` mengubah lokasi output.
+Untuk aplikasi nyata, cukup sunting `dyalisis.content.js` lalu ulangi
+`test` → `build`. `--content <file>` dan `--out <file>` bisa dipakai untuk
+menunjuk file/lokasi lain (default: `./dyalisis.content.js` dan `dist/index.html`).
 
 ## 4. Kontrak content layer (WAJIB)
 
@@ -202,12 +206,13 @@ langkah Alur.
 
 ## 5. Menambah aplikasi baru (langkah)
 
-1. Salin `src/data/example.js` → `src/data/<app>.js`.
+1. `npx dyalisis init <app>` → folder proyek + `dyalisis.content.js` (stub dari
+   `example.js`).
 2. Isi `APP`, `DOMAINS` (label + warna), `ROOT`, `MODULES`, `NODES`, lalu
    `ACTION_DEFS` (map `idFitur → [label aksi...]`) dan turunkan `ACTIONS`.
 3. Tulis `DATA_EDGES` = relasi data antar-fitur `[dari, ke, field_kunci]`.
-4. Jalankan `node test/run.mjs --content src/data/<app>.js` → harus 30/30 PASS.
-5. `node build.mjs --content src/data/<app>.js` → `dist/index.html`.
+4. Jalankan `npx dyalisis test` → harus 30/30 PASS.
+5. `npx dyalisis build` → `dist/index.html`.
 
 **Tips model:** domain = kelompok fungsional (bukan tim). Fitur = fungsi utama
 yang punya route/menu sendiri. Aksi = operasi/tombol/route di dalam fitur.
@@ -227,8 +232,10 @@ layout rusak. Layout instant saat mount pakai `animate:false`.
 `cytoscape-elk` 1.2.2 punya bug upstream: `getPos()` membaca
 `parent.scratch('klay')` padahal scratch disimpan dengan key `'elk'`. Akibatnya
 **layout ELK mati begitu ada compound parent (parent/child)** — yang justru inti
-Dyalisis. `scripts/patch-elk.mjs` memperbaikinya (idempoten, dependency-free),
-dijalankan otomatis via `postinstall`. Jangan hapus langkah ini.
+Dyalisis. `lib/patch-elk.mjs` memperbaikinya (idempoten, dependency-free), dan
+dipanggil **lazy** dari `build.mjs`/`test/run.mjs` — di-resolve dari proyek pemakai
+via `createRequire`, jadi aman untuk npm hoisting. Tidak ada `postinstall` yang
+rapuh. Jangan hapus langkah ini.
 
 Catatan ELK compound: `hierarchyHandling:'INCLUDE_CHILDREN'` **harus** berada di
 dalam objek `options.elk{}` — cytoscape-elk hanya meneruskan `options.elk` sebagai
@@ -250,15 +257,21 @@ sehingga test jalan untuk content apa pun.
   entry Node (worker/fs) tidak bocor ke browser.
 - **shadcn asli**: komponen shadcn di-copy (Button/Card/Badge/Input) sebagai
   React + Tailwind — bukan paket CLI `shadcn-ui` (yang merupakan CLI Node usang).
-- **Content detachable**: `build.mjs` menulis `src/content.js` yang hanya
-  `export * from <CONTENT>`. Engine mengimpor `./content` — tak tahu aplikasi apa.
+- **Content detachable**: engine mengimpor spesifier sintetis `@dyalisis/content`;
+  `build.mjs` meng-alias spesifier itu ke file content proyek pemakai. Tidak ada
+  file generated yang ditulis ke paket/node_modules — paket tetap read-only.
 
-## 10. Publish ke GitHub (framework-only)
+## 10. Publikasi & kontribusi
 
 Repo mengirim **hanya engine**; data aplikasi tidak ikut. `.gitignore` sudah
-mengecualikan `node_modules/`, `dist/`, `src/content.js`, dan semua
-`src/data/*` kecuali `example.js`. Aman: pengguna repo menjalankan
-`npm install && npm run build` dan langsung dapat demo dari `example.js`.
+mengecualikan `node_modules/`, `dist/`, dan `.dyalisis-tmp/`. Pengguna memasang
+via npm (`npx dyalisis init`) — `example.js` di-ship sebagai content demo default.
+
+Ingin **mengembangkan/meningkatkan framework-nya sendiri** (bukan sekadar memakai)?
+Baca [`CONTRIBUTING.md`](../../../CONTRIBUTING.md) dan skill
+[`.claude/skills/dyalisis-contribute/SKILL.md`](../dyalisis-contribute/SKILL.md):
+peta extension point, konvensi wajib, cara menambah check test, dan alur rilis.
+
 ## 11. Case study — contoh SIMRS SaaS multi-tenant
 
 Contoh anonim pemakaian Dyalisis pada sebuah aplikasi **SIMRS/HMS** (sistem

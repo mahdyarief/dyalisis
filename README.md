@@ -1,10 +1,12 @@
 # Dyalisis
 
-**Reusable feature-analysis visualization framework.** Ubah daftar fitur sebuah
+**Feature-analysis visualization framework.** Ubah daftar fitur sebuah
 aplikasi menjadi **satu file HTML interaktif mandiri** (tanpa server, tanpa CDN).
 
 Dibangun dari Cytoscape.js + shadcn/ui (React) + Tailwind, di-bundle esbuild.
 Engine dan content **terpisah total** — ganti satu file data untuk aplikasi baru.
+Dipakai sebagai paket npm (`npx dyalisis init`) di mana content hidup di proyek
+pemakai dan engine tetap read-only di dalam paket.
 
 ## Model visual
 
@@ -39,20 +41,25 @@ data; content boleh menimpanya lewat `ARC42`/`DOCS`.
 
 ## Quickstart
 
+Pakai sebagai framework npm — buat proyek content baru, lalu isi data aplikasi:
+
 ```bash
-npm install     # postinstall mem-patch bug upstream cytoscape-elk (WAJIB)
-npm run build   # → dist/index.html (demo dari src/data/example.js)
-npm test        # 30 self-check headless
+npx dyalisis init aplikasi-saya   # scaffold folder proyek content
+cd aplikasi-saya
+npm install
+npx dyalisis test                 # 30 self-check headless → harus semua PASS
+npx dyalisis build                # → dist/index.html (single-file, offline)
 ```
 
-Buka `dist/index.html` di browser.
+Buka `dist/index.html` di browser. AI agent cukup menyunting `dyalisis.content.js`
+(kontrak ada di `.claude/skills/dyalisis/SKILL.md` yang ikut di-scaffold).
 
 ## Pakai untuk aplikasi Anda
 
-1. Salin `src/data/example.js` → `src/data/app-anda.js`.
-2. Isi sesuai kontrak (§ Content contract di bawah).
-3. `node test/run.mjs --content src/data/app-anda.js` → harus **30/30 PASS**.
-4. `node build.mjs --content src/data/app-anda.js` → `dist/index.html`.
+1. `npx dyalisis init <nama-app>` → folder proyek + `dyalisis.content.js` (stub).
+2. Isi `dyalisis.content.js` sesuai kontrak (§ Content contract di bawah).
+3. `npx dyalisis test` → harus **30/30 PASS**.
+4. `npx dyalisis build` → `dist/index.html`.
 
 ## Content contract
 
@@ -70,11 +77,15 @@ tiap modul ≥1 fitur, tiap fitur ≥1 aksi, semua `domain` terdaftar di `DOMAIN
 ## Struktur
 
 ```
-build.mjs      bundler → single HTML      src/index.jsx       app React
-src/lib/       preset layout              src/components/     GraphCanvas + ui/*
-src/data/      content layer              test/run.mjs        self-test
-scripts/       patch-elk.mjs              template.html       shell HTML
+bin/dyalisis.mjs  CLI (init/build/test)   src/index.jsx       app React
+build.mjs         bundler → single HTML   src/components/     GraphCanvas + ui/*
+lib/scaffold.mjs  scaffolder proyek        src/lib/            preset layout + flow
+lib/patch-elk.mjs patch cytoscape-elk      test/run.mjs        self-test
+src/data/         contoh content           template.html       shell HTML
 ```
+
+Engine diambil dari direktori paket; **content** dari proyek pemakai
+(`./dyalisis.content.js`) di-alias lewat esbuild — paket tetap read-only.
 
 ## Untuk AI Agent
 
@@ -86,5 +97,10 @@ sebelum mulai — keduanya memuat kontrak content, alur kerja, dan gotcha.
 
 - **Single-file**: esbuild bundle (IIFE, minify) → CSS+JS di-inline ke template.
 - **Patch cytoscape-elk**: versi 1.2.2 punya bug yang mematikan layout ELK saat ada
-  compound node; `scripts/patch-elk.mjs` memperbaikinya via `postinstall`.
-- **Repo ini hanya membawa engine** — `src/data/*` (selain `example.js`) di-gitignore.
+  compound node; `lib/patch-elk.mjs` memperbaikinya **lazy** (saat `build`/`test`),
+  di-resolve dari proyek pemakai — jadi aman untuk npm hoisting dan tanpa
+  `postinstall` yang rapuh.
+- **Paket read-only**: content proyek di-alias lewat esbuild (`@dyalisis/content`),
+  sehingga tidak ada file generated yang ditulis ke `node_modules`.
+- **Kontrak content** ikut di-scaffold ke `.claude/skills/dyalisis/SKILL.md` supaya
+  AI agent di proyek pemakai langsung tahu cara mengisi `dyalisis.content.js`.

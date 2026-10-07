@@ -5,10 +5,16 @@
 import { createRequire } from 'node:module';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { existsSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const REPO = resolve(__dirname, '..');
-const require = createRequire(pathToFileURL(resolve(REPO, 'package.json')));
+const ENGINE = resolve(__dirname, '..');          // direktori paket (engine)
+const PROJECT = process.cwd();                    // direktori proyek pemakai
+const require = createRequire(pathToFileURL(resolve(ENGINE, 'package.json')));
+
+// Patch cytoscape-elk dari node_modules proyek (aman terhadap hoisting npm).
+const { patchElk } = await import(pathToFileURL(resolve(ENGINE, 'lib/patch-elk.mjs')).href);
+patchElk(PROJECT);
 
 // Bare specifier: paket-paket ini membatasi subpath lewat field "exports",
 // jadi `require('cytoscape-dagre/dist/...')` ditolak (ERR_PACKAGE_PATH_NOT_EXPORTED).
@@ -26,12 +32,17 @@ const flagValue = (name) => {
   return i >= 0 ? args[i + 1] : undefined;
 };
 const contentArg = flagValue('--content');
-const CONTENT = contentArg ? resolve(REPO, contentArg) : resolve(REPO, 'src/data/example.js');
+// Default: content proyek `./dyalisis.content.js` kalau ada; jika tidak, content
+// demo (example.js) yang di-ship bersama paket. Override dengan --content.
+const localContent = resolve(PROJECT, 'dyalisis.content.js');
+const CONTENT = contentArg
+  ? resolve(PROJECT, contentArg)
+  : (existsSync(localContent) ? localContent : resolve(ENGINE, 'src/data/example.js'));
 const C = await import(pathToFileURL(CONTENT).href);
 
 // Fungsi engine asli (bukan replika) — buildActivePath & style dipakai engine.
-const { buildActivePath } = await import(pathToFileURL(resolve(REPO, 'src/lib/flow.js')).href);
-const { buildGraphStyle, graphPalette } = await import(pathToFileURL(resolve(REPO, 'src/lib/graph-style.js')).href);
+const { buildActivePath } = await import(pathToFileURL(resolve(ENGINE, 'src/lib/flow.js')).href);
+const { buildGraphStyle, graphPalette } = await import(pathToFileURL(resolve(ENGINE, 'src/lib/graph-style.js')).href);
 
 // Registrasi extensions (dagre/elk export berupa fungsi register).
 for (const ext of [dagre, elk]) {

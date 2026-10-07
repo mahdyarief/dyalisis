@@ -14,8 +14,10 @@ import {
   IconSearch, IconPanel, IconChevron, IconArrowRight, IconArrowLeft, IconTarget,
   IconChevronDown, IconCheck, IconBook
 } from './components/icons.jsx';
-// Content layer — di-generate build.mjs dari --content (detachable).
-import * as C from './content.js';
+// Content layer — alias `@dyalisis/content` dipasang build.mjs; engine tetap
+// read-only karena tak ada file generated yang ditulis ke paket. Content diambil
+// dari proyek pemakai (./dyalisis.content.js), bukan dari dalam paket.
+import * as C from '@dyalisis/content';
 
 const APP = C.APP || { name: 'Dyalisis', subtitle: 'Feature Analysis Graph' };
 
