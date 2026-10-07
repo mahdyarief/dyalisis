@@ -10,7 +10,7 @@ const PALETTES = {
     appBorder: '#38bdf8', actionText: '#94a3b8',
     edge: '#475569', edgeText: '#64748b', edgeTextBg: '#0f172a',
     selectedBorder: '#f8fafc', selectedText: '#f8fafc',
-    blacken: -0.3, highlight: '#38bdf8', matchBorder: '#fbbf24'
+    blacken: -0.3, highlight: '#38bdf8', matchBorder: '#fbbf24', noteColor: '#f472b6'
   },
   light: {
     nodeText: '#0f172a', nodeBorder: '#ffffff',
@@ -18,7 +18,7 @@ const PALETTES = {
     appBorder: '#0284c7', actionText: '#64748b',
     edge: '#94a3b8', edgeText: '#475569', edgeTextBg: '#ffffff',
     selectedBorder: '#0f172a', selectedText: '#0f172a',
-    blacken: 0, highlight: '#0284c7', matchBorder: '#d97706'
+    blacken: 0, highlight: '#0284c7', matchBorder: '#d97706', noteColor: '#db2777'
   }
 };
 
@@ -63,6 +63,27 @@ export function buildGraphStyle(theme) {
         'background-blacken': p.blacken, 'font-size': 12, color: p.selectedText } },
     // Hasil pencarian: border amber agar mudah terlihat tanpa menimpa warna domain.
     { selector: 'node.match', style: { 'border-width': 4, 'border-color': p.matchBorder } },
+    // Badge catatan: irisan pie kecil di sudut node — penanda bahwa node punya
+    // notes (jembatan Manusia↔AI) tanpa menutupi warna domain.
+    { selector: 'node.noted', style: {
+        'pie-size': '100%', 'pie-1-background-color': p.noteColor,
+        'pie-1-background-size': 12, 'pie-1-background-opacity': 1 } },
+    // Node pada jalur Alur: border pakai warna `highlight` yang sama dengan panah,
+    // supaya node + panah terbaca sebagai satu kesatuan jalur (bukan dua bahasa warna).
+    { selector: 'node.flow', style: {
+        'border-width': 4, 'border-color': p.highlight, 'font-weight': 700,
+        'text-outline-color': p.nodeBorder, 'text-outline-width': 2 } },
+    // Anchor = langkah yang sedang dipilih. Dideklarasikan TERAKHIR di antara
+    // penanda node agar border putihnya menang atas .match/.flow (di mode Alur
+    // semua node jalur ber-.flow, jadi tanpa ini pengguna tak tahu sedang di
+    // langkah mana). Pakai kelas, bukan :selected, karena seleksi bisa datang
+    // dari sidebar/tombol Berikutnya, bukan klik langsung pada kanvas.
+    { selector: 'node.anchor', style: {
+        'border-width': 5, 'border-color': p.selectedBorder,
+        'background-blacken': p.blacken, 'font-size': 12, 'font-weight': 700,
+        color: p.selectedText, 'text-outline-color': p.nodeBorder, 'text-outline-width': 2,
+        'underlay-color': p.selectedBorder, 'underlay-opacity': 0.3,
+        'underlay-padding': 7, 'underlay-shape': 'round-rectangle' } },
     { selector: 'edge', style: {
         width: 1.6, 'line-color': p.edge, 'curve-style': 'bezier',
         'target-arrow-color': p.edge, 'target-arrow-shape': 'triangle', 'arrow-scale': 1,
@@ -70,6 +91,11 @@ export function buildGraphStyle(theme) {
         'text-background-color': p.edgeTextBg, 'text-background-opacity': 0.8, 'text-background-padding': 2 } },
     { selector: 'node.faded', style: { opacity: 0.15 } },
     { selector: 'edge.faded', style: { opacity: 0.06 } },
-    { selector: 'edge.highlight', style: { 'line-color': p.highlight, 'target-arrow-color': p.highlight, width: 2.5 } }
+    { selector: 'edge.highlight', style: { 'line-color': p.highlight, 'target-arrow-color': p.highlight, width: 2.5 } },
+    // Edge antar-langkah berurutan pada jalur Alur — lebih tebal & panah lebih
+    // besar dari edge.highlight biasa. Dideklarasikan setelahnya agar menang.
+    { selector: 'edge.chain', style: {
+        width: 3.5, 'arrow-scale': 1.5, 'line-color': p.highlight,
+        'target-arrow-color': p.highlight, 'font-size': 9, 'font-weight': 700 } }
   ];
 }

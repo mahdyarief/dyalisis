@@ -31,8 +31,25 @@ export function toElements(nodes, edges, domains = {}) {
   };
 }
 
+/** Tandai edge antar-langkah berurutan pada jalur Alur (garis lebih tebal,
+ *  panah lebih besar) agar arah alur terbaca, bukan sekadar "semua menyala". */
+function markChainEdges(cy, flowPath) {
+  const pos = new Map(flowPath.map((id, i) => [id, i]));
+  cy.edges().forEach((e) => {
+    const s = pos.get(e.data('source'));
+    const t = pos.get(e.data('target'));
+    if (s !== undefined && t !== undefined && Math.abs(s - t) === 1) e.addClass('chain');
+  });
+}
+
+/** Tandai node terpilih sebagai "langkah saat ini". Lewat kelas, bukan
+ *  :selected, karena seleksi bisa datang dari sidebar/tombol Berikutnya. */
+function markAnchor(cy, selectedId) {
+  if (selectedId) cy.getElementById(selectedId).addClass('anchor');
+}
+
 /** Cytoscape graph canvas. Controlled-ish: exposes the cy instance via onReady. */
-export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelect, selectedId, onReady, matchIds, theme = 'dark' }) {
+export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelect, selectedId, onReady, matchIds, flowPath = null, notedIds = null, theme = 'dark' }) {
   const containerRef = React.useRef(null);
   const cyRef = React.useRef(null);
   const layoutRef = React.useRef(null);       // layout yang sedang berjalan (untuk .stop())
@@ -96,7 +113,14 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
   React.useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
-    cy.elements().removeClass('faded highlight match');
+    cy.elements().removeClass('faded highlight match anchor flow chain');
+
+    // Badge catatan (jembatan Manusia↔AI) — independen dari mode seleksi.
+    if (notedIds && notedIds.length) {
+      notedIds.forEach((id) => cy.getElementById(id).addClass('noted'));
+    }
+
+    const flowActive = flowPath && flowPath.length > 1;
 
     if (matchIds && matchIds.length) {
       let keep = cy.collection();
@@ -120,6 +144,15 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
       // Aksi (L3) milik fitur yang ter-highlight juga disorot.
       matched.descendants().addClass('match');
       keepEdges.addClass('highlight');
+      // Mode Alur: node jalur memakai warna border yang sama dengan panah
+      // (kelas .flow) dan edge antar-langkah berurutan dipertebal (.chain),
+      // supaya jalur terbaca sebagai satu kesatuan, bukan "semua menyala".
+      if (flowActive) {
+        matched.addClass('flow');
+        markChainEdges(cy, flowPath);
+      }
+      // Langkah yang sedang dipilih selalu ditandai, di mode apa pun.
+      markAnchor(cy, selectedId);
       return;
     }
 
@@ -132,7 +165,8 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
     const keepEdges = keep.edgesWith(keep).union(node.connectedEdges());
     cy.elements().not(keep).not(keepEdges).addClass('faded');
     keepEdges.addClass('highlight');
-  }, [selectedId, matchIds]);
+    markAnchor(cy, selectedId);
+  }, [selectedId, matchIds, flowPath, notedIds]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 }

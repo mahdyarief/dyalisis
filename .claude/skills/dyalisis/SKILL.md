@@ -117,6 +117,7 @@ export const DECISIONS = [{ title, status, context, decision }]; // ADR (arc42 �
 export const ARC42     = [{ no: 2, body: '...' }];               // override narasi seksi arc42 (1–12)
 export const GLOSSARY  = [{ term, definition }];                 // glosarium (arc42 §12)
 export const DOCS      = [{ kind: 'How-to', items: ['...'] }];   // artefak Diátaxis (menimpa turunan)
+export const NOTES     = { idNode: 'catatan kritis...' };        // seed catatan per node
 ```
 
 **Aturan struktur yang diuji `npm test`:**
@@ -154,6 +155,33 @@ dihitung dari data, lalu content boleh menimpa lewat simbol opsional.
 **Mode Alur:** tombol "Alur" di kanan-bawah kanvas menyorot rantai fitur
 end-to-end dari `DATA_EDGES`; sidebar menampilkan langkah berurutan + field
 penghubung (`via <field>`) dengan navigasi Sebelumnya/Berikutnya.
+
+Bahasa visualnya satu warna: node jalur **dan** panah sama-sama memakai warna
+`highlight` dari palet tema, jadi jalur terbaca sebagai satu kesatuan — bukan
+"panah menyala, node tidak". Kelas yang dipasang (`GraphCanvas.jsx`):
+
+| Kelas | Arti | Penanda visual |
+|---|---|---|
+| `node.flow` | node ikut jalur Alur | border warna `highlight`, tebal 4, label bold |
+| `edge.chain` | edge antar-langkah **berurutan** | tebal 3.5, panah 1.5×, warna `highlight` |
+| `node.anchor` | langkah yang **sedang dipilih** | border putih (5) + halo underlay |
+| `node.noted` | node punya catatan | irisan pie `noteColor` di sudut node |
+| `node.match` / `.faded` | hasil pencarian / di luar konteks | border amber / opacity turun |
+
+`anchor` dideklarasikan **terakhir** di antara penanda node pada
+`buildGraphStyle()`, karena cytoscape menyelesaikan konflik selector lewat
+urutan deklarasi — di mode Alur semua node jalur ber-`.flow`, jadi tanpa
+prioritas ini pengguna tidak tahu sedang berdiri di langkah mana. Kelas dipakai
+(bukan `:selected`) sebab seleksi bisa datang dari sidebar atau tombol
+Berikutnya, bukan klik pada kanvas.
+
+**Catatan node (jembatan Manusia↔AI):** tiap node bisa menyimpan catatan kritis
+— aturan bisnis tak tertulis, jebakan integrasi, alasan sebuah keputusan. Editor
+ada di sidebar saat sebuah node dipilih (Simpan/Hapus). Catatan tersimpan di
+`localStorage` kunci `dyalisis:notes:${APP.name}` dan **di-seed** dari `NOTES`
+content kalau penyimpanan masih kosong, sehingga kurasi AI/penulis content ikut
+terbawa ke build. Penandanya: badge pie pada node, hitungan di legenda, dan dot
+pada daftar langkah Alur.
 
 ## 5. Menambah aplikasi baru (langkah)
 

@@ -61,6 +61,12 @@ export const GLOSSARY = [
   { term: 'order_id', definition: 'Kunci pesanan yang mengikat Shipment & Invoice.' },
   { term: 'sku', definition: 'Kode stok barang — kunci entitas Inventory.' }
 ];
+// Notes per node (opsional) — seed catatan kritis (jembatan Manusia↔AI).
+// Pengguna dapat menambah/mengubah lewat sidebar "Catatan node" (localStorage).
+export const NOTES = {
+  orders: 'Sumber kebenaran status pesanan. Pembatalan tidak menghapus invoice yang sudah terbit — hanya menandai.',
+  inventory: 'Stok berkurang dari DUA jalur (shipment & invoice). Selalu uji keduanya saat mengubah logika stok.'
+};
 export const LEVELS = { 0: ['app'], 1: MODULES.map((m) => m.id), 2: NODES.map((n) => n.id), 3: ACTIONS.map((a) => a.id) };
 export const LEVEL_NAMES = { 0: 'Aplikasi', 1: 'Modul', 2: 'Fitur', 3: 'Aksi' };
 export const levelOf = (id) => { for (const k in LEVELS) if (LEVELS[k].includes(id)) return +k; return 0; };

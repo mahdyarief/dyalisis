@@ -24,11 +24,17 @@ Tiap node punya **UML class diagram** di sidebar (atribut dari field kunci,
 operasi dari aksi, asosiasi berlabel field penghubung) — digambar sebagai SVG
 inline, theme-aware, tanpa dependency tambahan. Klik diagram → **modal perbesar**.
 Mode **Alur** menyorot rantai fitur end-to-end dari relasi data (mis. Pendaftaran →
-Periksa → SOAP → Resep → Billing) di sidebar + highlight pada graph. Panel
-**Dokumentasi** (ikon buku di header) menyusun perspektif **C4 Model**, **arc42**
-(12 seksi lengkap), daftar **ADR** (dari `DECISIONS` opsional), **glosarium**
-(dari `GLOSSARY` opsional), dan **Diátaxis** (artefak nyata dari data). Tiap seksi
-punya default turunan dari data; content boleh menimpanya lewat `ARC42`/`DOCS`.
+Periksa → SOAP → Resep → Billing) di sidebar + highlight pada graph. Node jalur,
+panah berurutan, dan langkah yang sedang dipilih memakai **satu bahasa warna**
+sehingga alur terbaca sebagai satu kesatuan; penanda tiap keadaan dijelaskan di
+legenda. Tiap node juga bisa punya **catatan** (aturan bisnis tak tertulis,
+jebakan integrasi) sebagai jembatan Manusia↔AI — tersimpan di `localStorage`,
+di-seed dari `NOTES` content, ditandai badge pada node, hitungan di legenda, dan
+dot pada daftar langkah Alur. Panel **Dokumentasi** (ikon buku di header)
+menyusun perspektif **C4 Model**, **arc42** (12 seksi lengkap), daftar **ADR**
+(dari `DECISIONS` opsional), **glosarium** (dari `GLOSSARY` opsional), dan
+**Diátaxis** (artefak nyata dari data). Tiap seksi punya default turunan dari
+data; content boleh menimpanya lewat `ARC42`/`DOCS`.
 
 ## Quickstart
 
@@ -52,6 +58,10 @@ Buka `dist/index.html` di browser.
 Satu modul ES mengekspor: `APP`, `DOMAINS`, `ROOT`, `MODULES`, `NODES`, `ACTIONS`,
 `EDGES`, `DATA_EDGES`, `LEVELS`, `LEVEL_NAMES`, `levelOf`. Detail + contoh ada di
 `src/data/example.js` dan `.claude/skills/dyalisis/SKILL.md` §4.
+
+Opsional (memperkaya panel Dokumentasi + catatan): `DECISIONS` (ADR), `ARC42`
+(override narasi seksi), `GLOSSARY` (glosarium), `DOCS` (artefak Diátaxis),
+`NOTES` (seed catatan per node: `{ idNode: 'catatan kritis...' }`).
 
 Aturan wajib: id unik, parent valid tanpa siklus, `MODULES[i].id` = `mod-<domain>`,
 tiap modul ≥1 fitur, tiap fitur ≥1 aksi, semua `domain` terdaftar di `DOMAINS`.
