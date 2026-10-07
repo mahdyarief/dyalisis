@@ -9,6 +9,7 @@
   "files": [
     "bin",
     "lib",
+    "server",
     "build.mjs",
     "scripts",
     "src/components",
@@ -22,6 +23,7 @@
     "AGENTS.md",
     "README.md",
     "CONTRIBUTING.md",
+    "DEPLOY.md",
     ".claude/skills"
   ],
   "engines": {
@@ -30,6 +32,9 @@
   "scripts": {
     "build": "node bin/dyalisis.mjs build",
     "test": "node bin/dyalisis.mjs test",
+    "test:publish": "node test/publish.mjs",
+    "publish": "node bin/dyalisis.mjs publish",
+    "serve": "node bin/dyalisis.mjs serve",
     "patch-elk": "node scripts/patch-elk.mjs"
   },
   "dependencies": {

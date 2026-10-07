@@ -61,6 +61,25 @@ Buka `dist/index.html` di browser. AI agent cukup menyunting `dyalisis.content.j
 3. `npx dyalisis test` → harus **30/30 PASS**.
 4. `npx dyalisis build` → `dist/index.html`.
 
+## Publish ke domain (opsional)
+
+Setelah build, publikasikan `dist/index.html` ke endpoint penerbit supaya bisa
+diakses publik (mis. `https://dyalisis.nimb.us.ci/softmedis`):
+
+```bash
+npx dyalisis login <handle>             # sekali: daftar identitas → simpan token
+npx dyalisis publish                    # build + unggah (slug default = nama app)
+npx dyalisis publish --slug softmedis   # custom naming
+npx dyalisis publish --overwrite        # timpa publikasi lama (slug sama)
+npx dyalisis list --remote              # lihat publikasi milikmu di server
+```
+
+Slug **otomatis unik**: kalau `softmedis` sudah ada, jadi `softmedis-1`, dst.
+Server penerbit (zero-dep, tanpa DB) ada di [`server/`](server); cara deploy ke
+VPS + HTTPS ada di [`DEPLOY.md`](DEPLOY.md). Endpoint & token diambil dari
+`--url`/`--token`, env `DYALISIS_PUBLISH_URL`/`DYALISIS_TOKEN`, atau
+`.dyalisisrc.json`.
+
 ## Content contract
 
 Satu modul ES mengekspor: `APP`, `DOMAINS`, `ROOT`, `MODULES`, `NODES`, `ACTIONS`,
@@ -77,10 +96,13 @@ tiap modul ≥1 fitur, tiap fitur ≥1 aksi, semua `domain` terdaftar di `DOMAIN
 ## Struktur
 
 ```
-bin/dyalisis.mjs  CLI (init/build/test)   src/index.jsx       app React
-build.mjs         bundler → single HTML   src/components/     GraphCanvas + ui/*
-lib/scaffold.mjs  scaffolder proyek        src/lib/            preset layout + flow
-lib/patch-elk.mjs patch cytoscape-elk      test/run.mjs        self-test
+bin/dyalisis.mjs  CLI (init/build/test/publish/serve/login/list)
+build.mjs         bundler → single HTML   src/index.jsx       app React
+lib/scaffold.mjs  scaffolder proyek        src/components/     GraphCanvas + ui/*
+lib/patch-elk.mjs patch cytoscape-elk      src/lib/            preset layout + flow
+lib/publish.mjs   client publish           test/run.mjs        self-test (30)
+lib/slug.mjs      slug unik bersama        test/publish.mjs    self-test publish
+server/           publish server (zero-dep, tanpa DB)
 src/data/         contoh content           template.html       shell HTML
 ```
 

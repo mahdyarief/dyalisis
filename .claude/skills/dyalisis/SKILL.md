@@ -263,6 +263,15 @@ sehingga test jalan untuk content apa pun.
 
 ## 10. Publikasi & kontribusi
 
+**Publish ke domain** (opsional): `npx dyalisis login <handle>` → `npx dyalisis
+publish`. Slug dari nama app (slugify), **unik otomatis** di sisi server
+(`softmedis` → `softmedis-1`), `--slug` untuk custom, `--overwrite` untuk menimpa.
+Server rujukan zero-dep ada di `server/publish-server.mjs` (env
+`PORT`/`DYALISIS_DATA_DIR`/`DYALISIS_PUBLISH_TOKEN`/`DYALISIS_PUBLIC_URL`);
+jalankan `npx dyalisis serve`. Tanpa `DYALISIS_PUBLISH_TOKEN` = mode terbuka
+(siapa saja boleh publish lewat `/api/register`); dengan token = mode tertutup.
+Deploy ke VPS + HTTPS ada di [`DEPLOY.md`](../../../DEPLOY.md).
+
 Repo mengirim **hanya engine**; data aplikasi tidak ikut. `.gitignore` sudah
 mengecualikan `node_modules/`, `dist/`, dan `.dyalisis-tmp/`. Pengguna memasang
 via npm (`npx dyalisis init`) — `example.js` di-ship sebagai content demo default.

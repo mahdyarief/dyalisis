@@ -38,7 +38,10 @@ npm run build     # → dist/index.html (demo dari src/data/example.js)
 | Wiring app / state | `src/index.jsx` | data → elemen cytoscape, toolbar, sidebar |
 | Check verifikasi | `test/run.mjs` | `check('nama', kondisi)` |
 | File proyek hasil scaffold | `lib/scaffold.mjs` | apa yang di-copy saat `init` |
-| Alur CLI | `bin/dyalisis.mjs` | init / build / test |
+| Alur CLI | `bin/dyalisis.mjs` | init / build / test / login / publish / list / serve |
+| Client publish | `lib/publish.mjs` | resolveConfig, publishHtml, login/list |
+| Slug unik & sanitize | `lib/slug.mjs` | `slugify`, `isSafeSlug` (dipakai client + server) |
+| Server penerbit | `server/publish-server.mjs`, `server/store.mjs` | route HTTP + storage filesystem |
 | Bundling | `build.mjs` | esbuild + tailwind → inline |
 
 ## Konvensi wajib

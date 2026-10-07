@@ -11,6 +11,9 @@ lengkapnya ada di **`.claude/skills/dyalisis/SKILL.md`** — baca itu dulu.
 npx dyalisis init <nama-app>   # scaffold proyek content baru (folder + stub)
 npx dyalisis test              # 30 self-check headless, harus hijau
 npx dyalisis build             # → dist/index.html (single-file, offline)
+npx dyalisis login <handle>    # daftar identitas → simpan token
+npx dyalisis publish           # build + unggah → URL publik (slug unik otomatis)
+npx dyalisis list --remote     # lihat publikasi milikmu
 ```
 
 Di repo engine ini sendiri (dev), `npm run build` / `npm test` setara; engine &
