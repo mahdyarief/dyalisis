@@ -19,7 +19,13 @@ const elk = require('cytoscape-elk');
 // Default ke content demo (example.js) supaya `npm test` jalan di repo framework
 // yang tidak membawa data aplikasi. Override: `--content src/data/<app>.js`.
 const args = process.argv.slice(2);
-const contentArg = args[args.indexOf('--content') + 1];
+// Ambil nilai flag hanya bila flag benar-benar ada; jika tidak, indexOf = -1 dan
+// args[indexOf+1] akan salah menangkap args[0] (mis. `--out` jadi path content).
+const flagValue = (name) => {
+  const i = args.indexOf(name);
+  return i >= 0 ? args[i + 1] : undefined;
+};
+const contentArg = flagValue('--content');
 const CONTENT = contentArg ? resolve(REPO, contentArg) : resolve(REPO, 'src/data/example.js');
 const C = await import(pathToFileURL(CONTENT).href);
 
