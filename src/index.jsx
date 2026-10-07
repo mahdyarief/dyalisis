@@ -210,6 +210,11 @@ export default function DyalisisApp() {
     return [];
   }, [query, matchIds, flowMode, flowPath]);
 
+  // Saat pencarian aktif, bahasa visual Alur (border .flow + edge .chain) harus
+  // mati — kalau tidak, hasil pencarian ikut ter-stempel sebagai node jalur alur
+  // padahal bukan. Sidebar tetap menampilkan daftar langkahnya sebagai konteks.
+  const graphFlowPath = query.trim() ? [] : flowPath;
+
   // Posisi node terpilih di dalam jalur Alur (untuk navigasi langkah).
   const flowIdx = selected ? flowPath.indexOf(selected.id) : -1;
 
@@ -333,9 +338,9 @@ export default function DyalisisApp() {
       <div className="flex min-h-0 flex-1">
         <main className="relative min-w-0 flex-1">
           <GraphCanvas nodes={filteredNodes} edges={edges} domains={domains} layoutName={layoutName}
-            selectedId={selectedId} matchIds={highlightIds} flowPath={flowPath} notedIds={notedIds}
+            selectedId={selectedId} matchIds={highlightIds} flowPath={graphFlowPath} notedIds={notedIds}
             theme={theme} onSelect={setSelectedId} onReady={setCyRef} />
-          <Legend domains={domains} showActions={showActions} flowActive={flowMode && flowPath.length > 1}
+          <Legend domains={domains} showActions={showActions} flowActive={flowMode && graphFlowPath.length > 1}
             notedCount={notedIds.length} highlight={graphPalette(theme).highlight}
             noteColor={graphPalette(theme).noteColor} />
           <div className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-background/80 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
