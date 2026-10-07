@@ -67,7 +67,12 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
       style: buildGraphStyle(theme),
       minZoom: 0.2,
       maxZoom: 6,
-      wheelSensitivity: 1.2
+      wheelSensitivity: 1.2,
+      // Sentuh: matikan box-select supaya tap-drag = pan (bukan seleksi area),
+      // dan longgarkan ambang tap agar jari tidak salah memilih node.
+      boxSelectionEnabled: false,
+      touchTapThreshold: 8,
+      desktopTapThreshold: 4
     });
     cy.on('tap', 'node', (evt) => { if (onSelect) onSelect(evt.target.id()); });
     cy.on('tap', (evt) => { if (evt.target === cy && onSelect) onSelect(null); });
@@ -77,6 +82,16 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
     if (onReady) onReady(cy);
     return () => { cy.destroy(); cyRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cytoscape tak memantau perubahan ukuran container; resize manual saat
+  // layout berubah (rotasi layar, sidebar buka/tutup) agar kanvas tidak salah skala.
+  React.useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => { if (cyRef.current) cyRef.current.resize(); });
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   // Ganti tema: rebuild style pada instance yang sama (tanpa menyentuh posisi).

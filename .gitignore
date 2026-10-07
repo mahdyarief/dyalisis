@@ -8,6 +8,11 @@ dist/
 src/data/*
 !src/data/example.js
 
+# Secrets — jangan pernah ikut ter-commit.
+.secret
+.env
+.env.*
+
 # OS / editor
 .DS_Store
 Thumbs.db

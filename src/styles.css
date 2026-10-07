@@ -51,7 +51,15 @@
 @layer base {
   * { @apply border-border; }
   html, body, #root { height: 100%; }
-  body { @apply bg-background text-foreground; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  /* overscroll-behavior: none mencegah pull-to-refresh/overscroll browser
+     mengganggu pan pada kanvas graf (apps-shell layar penuh). */
+  body { @apply bg-background text-foreground; overscroll-behavior: none; }
+  /* Tinggi app-shell mengikuti viewport dinamis (address bar mobile) bila didukung,
+     agar kanvas tidak terpotong/overheight saat toolbar browser muncul-hilang. */
+  @supports (height: 100dvh) {
+    #root { height: 100dvh; }
+  }
 }
 
 @layer utilities {

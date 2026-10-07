@@ -4,9 +4,25 @@ import * as React from 'react';
 // pointer-events-auto karena container graph memakai default (bisa menerima event).
 export default function Legend({ domains, showActions, appBorder = '#38bdf8',
   flowActive = false, notedCount = 0, highlight = '#38bdf8', noteColor = '#f472b6' }) {
+  // Di layar kecil legenda default terlipat jadi tombol (agar tak menutupi kanvas);
+  // di desktop tetap terbuka. State lokal karena Legend murni presentasional.
+  const [open, setOpen] = React.useState(() =>
+    typeof window === 'undefined' ? true : window.matchMedia('(min-width: 640px)').matches);
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)}
+        className="pointer-events-auto absolute right-3 top-3 rounded-lg border bg-background/85 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground shadow backdrop-blur">
+        Legenda
+      </button>
+    );
+  }
   return (
     <div className="pointer-events-auto absolute right-3 top-3 w-44 rounded-lg border bg-background/85 p-3 text-xs shadow backdrop-blur">
-      <p className="mb-2 font-semibold text-muted-foreground">Legenda</p>
+      <button type="button" onClick={() => setOpen(false)}
+        className="mb-2 flex w-full items-center justify-between font-semibold text-muted-foreground">
+        <span>Legenda</span>
+        <span className="text-[10px] leading-none opacity-70">✕</span>
+      </button>
       <div className="space-y-1">
         {Object.entries(domains).map(([k, d]) => (
           <div key={k} className="flex items-center gap-2">

@@ -80,6 +80,30 @@ VPS + HTTPS ada di [`DEPLOY.md`](DEPLOY.md). Endpoint & token diambil dari
 `--url`/`--token`, env `DYALISIS_PUBLISH_URL`/`DYALISIS_TOKEN`, atau
 `.dyalisisrc.json`.
 
+### Username/handle bebas? Tergantung mode server
+
+Mode ditentukan env `DYALISIS_PUBLISH_TOKEN` di server:
+
+- **Mode terbuka** (tanpa token) — **username bebas**: siapa pun boleh
+  `dyalisis login <handle>` dengan handle apa pun (harus unik; gagal bila sudah
+  dipakai). Handle itu jadi **owner** publikasi dan muncul di listing per-user
+  `https://<host>/u/<handle>`. Ini mode multi-tenant publik.
+- **Mode tertutup** (token di-set) — registrasi mandiri **dimatikan**, jadi
+  `dyalisis login` gagal (`403 registrasi dimatikan`). Semua publish memakai satu
+  token bersama, dan **owner** diambil dari header `X-Dyalisis-Owner`
+  (default `public`) — bukan dari handle.
+
+Surface listing yang tersedia di kedua mode:
+
+| Surface | URL |
+|---|---|
+| Listing global | `https://<host>/` |
+| Listing per-user | `https://<host>/u/<owner>` |
+| JSON semua publikasi | `https://<host>/api/publications` |
+| JSON per-owner | `https://<host>/api/publications?owner=<owner>` |
+| Artefak | `https://<host>/<slug>` |
+| Health | `https://<host>/health` → `{ "ok": true }` |
+
 ## Content contract
 
 Satu modul ES mengekspor: `APP`, `DOMAINS`, `ROOT`, `MODULES`, `NODES`, `ACTIONS`,

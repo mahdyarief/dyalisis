@@ -19,6 +19,18 @@ npx dyalisis list --remote     # lihat publikasi milikmu
 Di repo engine ini sendiri (dev), `npm run build` / `npm test` setara; engine &
 content di repo ini memakai `src/data/example.js` sebagai demo.
 
+## Publish & mode auth (singkat)
+
+`login`/`publish`/`list --remote` bergantung pada mode server (`DYALISIS_PUBLISH_TOKEN`):
+
+- **Mode terbuka** (tanpa token): `login <handle>` berhasil; handle bebas tapi unik
+  → jadi **owner** publikasi (listing `/u/<handle>`).
+- **Mode tertutup** (token di-set): `login` **gagal** (`403 registrasi dimatikan`);
+  publish pakai satu token bersama, owner dari header `X-Dyalisis-Owner` (default
+  `public`) — bukan handle.
+
+Detail lengkap: `.claude/skills/dyalisis/SKILL.md` §10.
+
 ## Alur kerja agent
 
 1. Pelajari aplikasi target → susun hierarki 4 level: Aplikasi → Modul → Fitur → Aksi.

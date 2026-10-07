@@ -266,11 +266,45 @@ sehingga test jalan untuk content apa pun.
 **Publish ke domain** (opsional): `npx dyalisis login <handle>` → `npx dyalisis
 publish`. Slug dari nama app (slugify), **unik otomatis** di sisi server
 (`softmedis` → `softmedis-1`), `--slug` untuk custom, `--overwrite` untuk menimpa.
+
 Server rujukan zero-dep ada di `server/publish-server.mjs` (env
 `PORT`/`DYALISIS_DATA_DIR`/`DYALISIS_PUBLISH_TOKEN`/`DYALISIS_PUBLIC_URL`);
-jalankan `npx dyalisis serve`. Tanpa `DYALISIS_PUBLISH_TOKEN` = mode terbuka
-(siapa saja boleh publish lewat `/api/register`); dengan token = mode tertutup.
-Deploy ke VPS + HTTPS ada di [`DEPLOY.md`](../../../DEPLOY.md).
+jalankan `npx dyalisis serve`. Deploy ke VPS + HTTPS ada di
+[`DEPLOY.md`](../../../DEPLOY.md).
+
+### Dua mode auth & arti "username"
+
+`DYALISIS_PUBLISH_TOKEN` menentukan mode. Memahami ini penting supaya tidak
+bingung kenapa `login` berhasil/gagal atau kenapa owner-nya bukan handle.
+
+| | **Terbuka** (tanpa token) | **Tertutup** (token di-set) |
+|---|---|---|
+| `dyalisis login <handle>` | berhasil — handle bebas, **unik** | **gagal** (`403 registrasi dimatikan`) |
+| Publish | tanpa token → owner `anonymous`; dengan token registrasi → owner = handle | wajib `X-Dyalisis-Token` = token server, kalau tidak `401 token salah` |
+| Owner publikasi | handle yang didaftarkan | header `X-Dyalisis-Owner` (default `public`) |
+
+- **Mode terbuka** = multi-tenant publik: siapa pun boleh `POST /api/register
+  {handle}` untuk mendapat token, lalu publish. Handle dipakai sebagai **owner**
+  dan listing per-user (`/u/<handle>`). Username **bebas** tapi harus unik —
+  register gagal bila sudah dipakai.
+- **Mode tertutup** = satu token bersama untuk semua publish; registrasi mandiri
+  dimatikan. Owner diambil dari header `X-Dyalisis-Owner`, **bukan** dari handle.
+  Konsekuensinya: `dyalisis login` tidak berguna di mode ini (endpoint-nya ditolak),
+  dan klien `publish` (yang tidak mengirim header owner) akan mencatat owner
+  `public`. Untuk owner kustom, kirim publish manual dengan header
+  `X-Dyalisis-Owner: <nama>`.
+
+### Surface HTTP server
+
+| Method & path | Fungsi |
+|---|---|
+| `GET /` | listing global (HTML) |
+| `GET /u/<owner>` | listing per-user (HTML) |
+| `GET /<slug>` | artefak `index.html` yang dipublikasikan |
+| `GET /health` | `{ ok: true }` |
+| `GET /api/publications[?owner=]` | listing (JSON) |
+| `POST /api/register {handle}` | daftar handle → token (**mode terbuka**) |
+| `POST /api/publish` | unggah artefak; body = HTML mentah, header `X-Dyalisis-Slug` / `X-Dyalisis-Overwrite` / `X-Dyalisis-Token` |
 
 Repo mengirim **hanya engine**; data aplikasi tidak ikut. `.gitignore` sudah
 mengecualikan `node_modules/`, `dist/`, dan `.dyalisis-tmp/`. Pengguna memasang

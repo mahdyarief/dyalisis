@@ -12,7 +12,7 @@ import DocsPanel from './components/DocsPanel.jsx';
 import {
   IconPlus, IconMinus, IconFit, IconDownload, IconSun, IconMoon,
   IconSearch, IconPanel, IconChevron, IconArrowRight, IconArrowLeft, IconTarget,
-  IconChevronDown, IconCheck, IconBook
+  IconChevronDown, IconCheck, IconBook, IconClose
 } from './components/icons.jsx';
 // Content layer — alias `@dyalisis/content` dipasang build.mjs; engine tetap
 // read-only karena tak ada file generated yang ditulis ke paket. Content diambil
@@ -21,6 +21,12 @@ import * as C from '@dyalisis/content';
 
 const APP = C.APP || { name: 'Dyalisis', subtitle: 'Feature Analysis Graph' };
 
+// Breakpoint desktop: panel samping inline (lg). Di bawahnya panel jadi drawer
+// overlay yang bisa dibuka/tutup — supaya kanvas tetap lega di layar kecil.
+const DESKTOP_MQ = '(min-width: 1024px)';
+const isDesktopViewport = () =>
+  typeof window !== 'undefined' && window.matchMedia(DESKTOP_MQ).matches;
+
 export default function DyalisisApp() {
   const [layoutName, setLayoutName] = React.useState(DEFAULT_LAYOUT);
   const [selectedId, setSelectedId] = React.useState(null);
@@ -28,7 +34,7 @@ export default function DyalisisApp() {
   const [cyRef, setCyRef] = React.useState(null);
   const [showActions, setShowActions] = React.useState(false);
   const [theme, setTheme] = React.useState('dark');
-  const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const [sidebarOpen, setSidebarOpen] = React.useState(isDesktopViewport);
   const [layoutMenuOpen, setLayoutMenuOpen] = React.useState(false);
   const [flowMode, setFlowMode] = React.useState(false);
   const [flowStart, setFlowStart] = React.useState(null);       // fitur awal jalur Alur
@@ -239,6 +245,21 @@ export default function DyalisisApp() {
     return () => clearTimeout(t);
   }, [selectedId, zoomToNode]);
 
+  // Panel samping: inline di desktop, drawer overlay di mobile. Ikuti breakpoint
+  // saat ukuran layar berubah (buka di desktop, tutup di mobile) supaya state
+  // tidak nyangkut setelah rotasi/resize.
+  React.useEffect(() => {
+    const mq = window.matchMedia(DESKTOP_MQ);
+    const onChange = (e) => setSidebarOpen(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // Di mobile, memilih node membuka drawer detail (di desktop panel sudah tampak).
+  React.useEffect(() => {
+    if (selectedId && !window.matchMedia(DESKTOP_MQ).matches) setSidebarOpen(true);
+  }, [selectedId]);
+
   // Terapkan tema ke <html> (kelas .dark) agar token shadcn ikut berubah.
   React.useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -284,14 +305,14 @@ export default function DyalisisApp() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between gap-2 border-b bg-card px-4 py-2">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
+      <header className="flex items-center justify-between gap-2 border-b bg-card px-3 py-2 sm:px-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
             {APP.name.slice(0, 1)}
           </div>
-          <div>
-            <h1 className="text-sm font-semibold leading-tight">{APP.name}</h1>
-            <p className="text-xs text-muted-foreground">{APP.subtitle}</p>
+          <div className="min-w-0">
+            <h1 className="truncate text-sm font-semibold leading-tight">{APP.name}</h1>
+            <p className="truncate text-xs text-muted-foreground">{APP.subtitle}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -313,22 +334,22 @@ export default function DyalisisApp() {
         </div>
       </header>
 
-      <div className="flex flex-wrap items-center gap-1 border-b bg-card/50 px-4 py-2">
-        <span className="hidden text-xs text-muted-foreground md:inline">
-          Mode layout & tampilan Aksi (L3) ada di kanan-bawah kanvas.
+      <div className="flex flex-wrap items-center gap-2 border-b bg-card/50 px-3 py-2 sm:px-4">
+        <span className="hidden shrink-0 text-xs text-muted-foreground md:inline">
+          Mode layout &amp; tampilan Aksi (L3) ada di kanan-bawah kanvas.
         </span>
-        <div className="ml-auto flex items-center gap-2">
-          <div className="relative">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className="relative min-w-0 flex-1 sm:max-w-56">
             <IconSearch className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input ref={searchRef} className="h-8 w-44 pl-7 md:w-56" placeholder="Cari fitur / field…  ( / )"
+            <Input ref={searchRef} className="h-8 pl-7" placeholder="Cari fitur / field…"
               value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
-          <div className="flex items-center gap-0.5 rounded-md border p-0.5">
-            <Button size="icon" variant="ghost" className="h-7 w-7" title="Zoom in" onClick={() => zoomBy(1.3)}><IconPlus /></Button>
-            <Button size="icon" variant="ghost" className="h-7 w-7" title="Zoom out" onClick={() => zoomBy(1 / 1.3)}><IconMinus /></Button>
-            <Button size="icon" variant="ghost" className="h-7 w-7" title="Fit ke layar" onClick={handleFit}><IconFit /></Button>
+          <div className="flex shrink-0 items-center gap-0.5 rounded-md border p-0.5">
+            <Button size="icon" variant="ghost" className="h-8 w-8" title="Zoom in" onClick={() => zoomBy(1.3)}><IconPlus /></Button>
+            <Button size="icon" variant="ghost" className="h-8 w-8" title="Zoom out" onClick={() => zoomBy(1 / 1.3)}><IconMinus /></Button>
+            <Button size="icon" variant="ghost" className="h-8 w-8" title="Fit ke layar" onClick={handleFit}><IconFit /></Button>
           </div>
-          <Button size="sm" variant="outline" className="gap-1" onClick={exportPng}><IconDownload /> PNG</Button>
+          <Button size="sm" variant="outline" className="shrink-0 gap-1" onClick={exportPng}><IconDownload /><span className="hidden sm:inline">PNG</span></Button>
         </div>
       </div>
 
@@ -340,12 +361,12 @@ export default function DyalisisApp() {
           <Legend domains={domains} showActions={showActions} flowActive={flowMode && graphFlowPath.length > 1}
             notedCount={notedIds.length} highlight={graphPalette(theme).highlight}
             noteColor={graphPalette(theme).noteColor} />
-          <div className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-background/80 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
+          <div className="pointer-events-none absolute bottom-3 left-3 hidden rounded-md bg-background/80 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur sm:block">
             {filteredNodes.length} node · {edges.length} edge
           </div>
 
           {/* Klaster mode: layout + tampilan Aksi (L3) — kontekstual ke kanvas. */}
-          <div ref={layoutMenuRef} className="absolute bottom-3 right-3 z-10 flex items-center gap-2">
+          <div ref={layoutMenuRef} className="absolute bottom-3 right-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center justify-end gap-2">
             <Button size="sm" variant={flowMode ? 'default' : 'outline'} className="gap-1 shadow"
               title="Tampilkan jalur alur data end-to-end dari fitur terpilih" onClick={toggleFlow}>
               {flowMode && <IconCheck className="h-3.5 w-3.5" />} Alur
@@ -376,8 +397,28 @@ export default function DyalisisApp() {
           </div>
         </main>
 
-        <aside className={cn('no-scrollbar shrink-0 overflow-y-auto border-l bg-card/30 transition-all duration-200',
-          sidebarOpen ? 'w-80 p-3' : 'w-0 overflow-hidden border-l-0 p-0')}>
+        {sidebarOpen && (
+          <div className="fixed inset-0 z-20 bg-black/40 backdrop-blur-sm lg:hidden"
+            onClick={() => setSidebarOpen(false)} aria-hidden="true" />
+        )}
+
+        <aside className={cn(
+          'no-scrollbar overflow-y-auto bg-card/30',
+          // Mobile: drawer overlay dari kanan (lebar tetap, geser masuk/keluar).
+          'fixed inset-y-0 right-0 z-30 w-80 max-w-[85vw] border-l p-3 shadow-xl transition-transform duration-200',
+          sidebarOpen ? 'translate-x-0' : 'translate-x-full',
+          // Desktop: kembali ke layout inline; lebar dikontrol lewat state.
+          'lg:static lg:z-auto lg:max-w-none lg:translate-x-0 lg:shadow-none lg:transition-none',
+          sidebarOpen ? 'lg:w-80 lg:p-3' : 'lg:w-0 lg:overflow-hidden lg:border-l-0 lg:p-0'
+        )}>
+          {/* Mobile-only: tombol tutup (drawer menutupi sebagian besar layar,
+              jadi strip backdrop terlalu tipis untuk diandalkan). */}
+          <div className="mb-2 flex justify-end lg:hidden">
+            <Button size="icon" variant="ghost" title="Tutup panel"
+              className="h-8 w-8" onClick={() => setSidebarOpen(false)}>
+              <IconClose />
+            </Button>
+          </div>
           {emptySearch ? (
             <div className="flex min-h-[220px] flex-col items-center justify-center gap-2 p-6 text-center">
               <IconSearch className="h-8 w-8 text-muted-foreground" />

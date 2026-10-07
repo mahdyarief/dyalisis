@@ -15,12 +15,48 @@ PORT=8787 DYALISIS_DATA_DIR=/var/lib/dyalisis/data \
   npx dyalisis serve
 ```
 
-Mode auth:
+Mode auth (dipilih lewat `DYALISIS_PUBLISH_TOKEN`):
 
 | Kondisi | Perilaku |
 |---|---|
-| Tanpa `DYALISIS_PUBLISH_TOKEN` | **terbuka** — siapa saja boleh publish; `POST /api/register` memberi token (owner = handle). |
-| Dengan `DYALISIS_PUBLISH_TOKEN=<rahasia>` | **tertutup** — publish wajib sertakan token itu; owner diambil dari header `X-Dyalisis-Owner` (default `public`). Registrasi terbuka dimatikan. |
+| Tanpa `DYALISIS_PUBLISH_TOKEN` | **terbuka** (multi-tenant) — siapa saja boleh publish; `POST /api/register` memberi token (owner = handle). Handle bebas tapi unik. |
+| Dengan `DYALISIS_PUBLISH_TOKEN=<rahasia>` | **tertutup** — publish wajib sertakan token itu; owner diambil dari header `X-Dyalisis-Owner` (default `public`). Registrasi terbuka **dimatikan**. |
+
+Implikasi penting mode tertutup:
+
+- `POST /api/register` → `403 registrasi dimatikan`, sehingga **`dyalisis login`
+  tidak berguna** (endpoint daftar handle tertutup).
+- Publish tanpa token yang benar → `401 token salah`.
+- Klien `dyalisis publish` **tidak** mengirim header owner, jadi owner tercatat
+  `public`. Untuk owner kustom, publish manual dengan header
+  `X-Dyalisis-Owner: <nama>`.
+
+## Status deploy rujukan (dyalisis.nimb.us.ci)
+
+Deploy nyata yang berjalan memakai pola di dokumen ini:
+
+- **Container** `dyalisis:0.1.0` (image dari `Dockerfile` di repo, meng-install
+  paket `dyalisis` dari npm) di direktori `/opt/dyalisis`, port `127.0.0.1:8787`.
+- **Tunnel** `cloudflared-dyalisis.service` (config `/etc/cloudflared/dyalisis.yml`,
+  ingress → `http://localhost:8787`).
+- **Mode auth saat ini:** terbuka (multi-tenant publik) — `DYALISIS_PUBLISH_TOKEN`
+  tidak di-set, siapa pun boleh daftar handle & publish. Untuk mengunci, uncomment
+  baris token di `docker-compose.yml` lalu `docker compose up -d`.
+- **Publikasi contoh:** `https://dyalisis.nimb.us.ci/softmedis-app`.
+
+Perintah operasional umum di VPS:
+
+```bash
+cd /opt/dyalisis
+docker compose up -d --build          # deploy / rebuild
+docker compose logs -f                # log
+docker compose up -d                  # terapkan perubahan env, lalu
+docker ps --filter name=dyalisis      # cek status
+```
+
+> Jangan commit nilai `DYALISIS_PUBLISH_TOKEN` (atau kredensial apa pun) ke repo
+> atau ke dokumen yang di-ship ke npm. Simpan hanya di `docker-compose.yml` di
+> VPS (atau secret manager). Ganti token = ubah env lalu `docker compose up -d`.
 
 ## Deploy di VPS — Docker (disarankan)
 
