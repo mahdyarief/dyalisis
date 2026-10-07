@@ -14,7 +14,7 @@ import InsightPanel from './components/InsightPanel.jsx';
 import {
   IconPlus, IconMinus, IconFit, IconDownload, IconSun, IconMoon,
   IconSearch, IconPanel, IconChevron, IconArrowRight, IconArrowLeft, IconTarget,
-  IconChevronDown, IconCheck, IconBook, IconClose
+  IconChevronDown, IconCheck, IconBook, IconClose, IconFilter
 } from './components/icons.jsx';
 // Content layer — alias `@dyalisis/content` dipasang build.mjs; engine tetap
 // read-only karena tak ada file generated yang ditulis ke paket. Content diambil
@@ -29,6 +29,10 @@ const DESKTOP_MQ = '(min-width: 1024px)';
 const isDesktopViewport = () =>
   typeof window !== 'undefined' && window.matchMedia(DESKTOP_MQ).matches;
 
+// Pilihan level untuk filter facet (L1–L3) — dipakai tombol panel + chip aktif.
+const LEVEL_CHOICES = [[1, 'Modul'], [2, 'Fitur'], [3, 'Aksi']];
+const levelLabel = (lv) => (LEVEL_CHOICES.find(([v]) => v === lv) || [null, `L${lv}`])[1];
+
 export default function DyalisisApp() {
   const [layoutName, setLayoutName] = React.useState(DEFAULT_LAYOUT);
   const [selectedId, setSelectedId] = React.useState(null);
@@ -42,6 +46,7 @@ export default function DyalisisApp() {
   const [flowStart, setFlowStart] = React.useState(null);       // fitur awal jalur Alur
   const [branchChoice, setBranchChoice] = React.useState({});   // { nodeId: successorId }
   const [docsOpen, setDocsOpen] = React.useState(false);
+  const [filterMenuOpen, setFilterMenuOpen] = React.useState(false);
   // Filter facet — potong graf per domain, per level, atau hanya node ber-Catatan.
   // Melengkapi pencarian teks: facet berlaku lebih dulu, lalu query mempersempit.
   const [facetDomain, setFacetDomain] = React.useState(null);
@@ -49,6 +54,7 @@ export default function DyalisisApp() {
   const [facetNoted, setFacetNoted] = React.useState(false);
   const searchRef = React.useRef(null);
   const layoutMenuRef = React.useRef(null);
+  const filterMenuRef = React.useRef(null);
 
   const domains = C.DOMAINS || {};
 
@@ -87,6 +93,29 @@ export default function DyalisisApp() {
   // Filter facet: node yang lolos domain/level/catatan + seluruh ancestor-nya
   // (agar compound tidak orphan — pola sama seperti pencarian di bawah).
   const hasFacets = facetDomain != null || facetLevel != null || facetNoted;
+  // Turunan facet untuk UI: hitungan aktif, reset, dan daftar chip yang bisa dihapus.
+  const facetCount = (facetDomain != null ? 1 : 0) + (facetLevel != null ? 1 : 0) + (facetNoted ? 1 : 0);
+  const resetFacets = React.useCallback(() => {
+    setFacetDomain(null); setFacetLevel(null); setFacetNoted(false);
+  }, []);
+  const activeFacets = React.useMemo(() => {
+    const out = [];
+    if (facetDomain != null && domains[facetDomain]) {
+      out.push({
+        key: `dom-${facetDomain}`,
+        label: domains[facetDomain].label,
+        dot: domains[facetDomain].color,
+        clear: () => setFacetDomain(null)
+      });
+    }
+    if (facetLevel != null) {
+      out.push({ key: `lvl-${facetLevel}`, label: levelLabel(facetLevel), clear: () => setFacetLevel(null) });
+    }
+    if (facetNoted) {
+      out.push({ key: 'noted', label: 'Ber-Catatan', clear: () => setFacetNoted(false) });
+    }
+    return out;
+  }, [facetDomain, facetLevel, facetNoted, domains]);
   const facetedNodes = React.useMemo(() => {
     if (!hasFacets) return nodes;
     const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
@@ -248,10 +277,10 @@ export default function DyalisisApp() {
     if (node.type === 'action' && !showActions) setShowActions(true);
     if (query && !visibleIds.has(id)) setQuery('');
     if (hasFacets && !visibleIds.has(id)) {
-      setFacetDomain(null); setFacetLevel(null); setFacetNoted(false);
+      resetFacets();
     }
     setSelectedId(id);
-  }, [byIdAll, showActions, query, visibleIds, hasFacets]);
+  }, [byIdAll, showActions, query, visibleIds, hasFacets, resetFacets]);
 
   // Tap pada kanvas: klik latar (id null) membersihkan seleksi sekaligus
   // melepas mode Alur, supaya fokus jalur tidak menggantung saat pengguna
@@ -319,6 +348,16 @@ export default function DyalisisApp() {
     window.addEventListener('pointerdown', onDown);
     return () => window.removeEventListener('pointerdown', onDown);
   }, [layoutMenuOpen]);
+
+  // Tutup panel Filter saat klik di luar / Esc.
+  React.useEffect(() => {
+    if (!filterMenuOpen) return;
+    const onDown = (e) => { if (filterMenuRef.current && !filterMenuRef.current.contains(e.target)) setFilterMenuOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setFilterMenuOpen(false); };
+    window.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('pointerdown', onDown); window.removeEventListener('keydown', onKey); };
+  }, [filterMenuOpen]);
 
   const zoomBy = (f) => {
     const cy = cyRef;
@@ -393,35 +432,95 @@ export default function DyalisisApp() {
         </div>
       </div>
 
-      {/* Filter facet — potong graf per domain / level / Catatan. */}
-      <div className="flex items-center gap-1.5 overflow-x-auto border-b bg-card/30 px-3 py-1.5 text-[11px] sm:px-4">
-        <span className="shrink-0 text-muted-foreground">Filter</span>
-        {Object.entries(domains).map(([key, dv]) => (
-          <button key={key}
-            className={cn('inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 transition-colors',
-              facetDomain === key ? 'bg-accent font-medium' : 'hover:bg-accent/50')}
-            onClick={() => setFacetDomain(facetDomain === key ? null : key)}>
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: dv.color }} />
-            {dv.label}
+      {/* Filter facet — potong graf per domain / level / Catatan.
+          Pola popover: satu tombol "Filter" + chip filter aktif; opsi lengkap
+          di panel ter-anchor. Tanpa scroll horizontal di lebar mana pun. */}
+      <div className="flex flex-wrap items-center gap-1.5 border-b bg-card/30 px-3 py-1.5 text-[11px] sm:px-4">
+        <div ref={filterMenuRef} className="relative">
+          <button
+            className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 transition-colors',
+              hasFacets ? 'border-primary/40 bg-accent font-medium' : 'hover:bg-accent/50')}
+            aria-expanded={filterMenuOpen}
+            title="Filter graf per domain, level, atau catatan"
+            onClick={() => setFilterMenuOpen((v) => !v)}>
+            <IconFilter className="h-3.5 w-3.5" />
+            Filter
+            {facetCount > 0 && (
+              <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+                {facetCount}
+              </span>
+            )}
+            <IconChevronDown className={cn('h-3 w-3 opacity-60 transition-transform', filterMenuOpen && 'rotate-180')} />
           </button>
-        ))}
-        <span className="mx-0.5 h-3 w-px shrink-0 bg-border" />
-        {[[1, 'Modul'], [2, 'Fitur'], [3, 'Aksi']].map(([lv, label]) => (
-          <button key={lv}
-            className={cn('shrink-0 rounded-full border px-2 py-0.5 transition-colors',
-              facetLevel === lv ? 'bg-accent font-medium' : 'hover:bg-accent/50')}
-            onClick={() => { const next = facetLevel === lv ? null : lv; setFacetLevel(next); if (next === 3) setShowActions(true); }}>
-            {label}
-          </button>
-        ))}
-        <span className="mx-0.5 h-3 w-px shrink-0 bg-border" />
-        <button
-          className={cn('shrink-0 rounded-full border px-2 py-0.5 transition-colors',
-            facetNoted ? 'bg-accent font-medium' : 'hover:bg-accent/50')}
-          onClick={() => setFacetNoted((v) => !v)}>Ber-Catatan</button>
-        {hasFacets && (
-          <button className="shrink-0 rounded-full px-2 py-0.5 text-muted-foreground underline hover:text-foreground"
-            onClick={() => { setFacetDomain(null); setFacetLevel(null); setFacetNoted(false); }}>Reset</button>
+
+          {filterMenuOpen && (
+            <div className="absolute left-0 top-full z-30 mt-1 w-64 overflow-hidden rounded-lg border bg-popover shadow-lg">
+              <div className="px-3 pb-1 pt-2.5">
+                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Domain</p>
+                <div className="flex flex-wrap gap-1">
+                  {Object.entries(domains).map(([key, dv]) => (
+                    <button key={key}
+                      className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition-colors',
+                        facetDomain === key ? 'bg-accent font-medium' : 'hover:bg-accent/50')}
+                      onClick={() => setFacetDomain(facetDomain === key ? null : key)}>
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: dv.color }} />
+                      {dv.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="my-1 h-px bg-border" />
+              <div className="px-3 pb-1">
+                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Level</p>
+                <div className="flex flex-wrap gap-1">
+                  {LEVEL_CHOICES.map(([lv, label]) => (
+                    <button key={lv}
+                      className={cn('rounded-full border px-2 py-0.5 text-[11px] transition-colors',
+                        facetLevel === lv ? 'bg-accent font-medium' : 'hover:bg-accent/50')}
+                      onClick={() => { const next = facetLevel === lv ? null : lv; setFacetLevel(next); if (next === 3) setShowActions(true); }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="my-1 h-px bg-border" />
+              <div className="px-3 pb-2.5">
+                <button
+                  className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition-colors',
+                    facetNoted ? 'bg-accent font-medium' : 'hover:bg-accent/50')}
+                  onClick={() => setFacetNoted((v) => !v)}>
+                  {facetNoted && <IconCheck className="h-3 w-3" />} Ber-Catatan
+                </button>
+              </div>
+              {hasFacets && (
+                <>
+                  <div className="h-px bg-border" />
+                  <button
+                    className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-[11px] text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+                    onClick={resetFacets}>
+                    <IconClose className="h-3 w-3" /> Reset semua filter
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Chip filter aktif — bisa dihapus. Di mobile disembunyikan (hemat ruang,
+            tombol Filter sudah memuat badge jumlah). */}
+        {activeFacets.length > 0 && (
+          <div className="hidden min-w-0 flex-wrap items-center gap-1.5 sm:flex">
+            {activeFacets.map((f) => (
+              <button key={f.key}
+                className="inline-flex items-center gap-1 rounded-full border bg-secondary/60 px-2 py-0.5 text-[11px] transition-colors hover:bg-secondary"
+                title={`Hapus filter ${f.label}`}
+                onClick={f.clear}>
+                {f.dot != null && <span className="h-1.5 w-1.5 rounded-full" style={{ background: f.dot }} />}
+                {f.label}
+                <IconClose className="h-3 w-3 opacity-60" />
+              </button>
+            ))}
+          </div>
         )}
       </div>
 

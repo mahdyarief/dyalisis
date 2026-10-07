@@ -22,8 +22,11 @@ Dekomposisi fungsional 4 tingkat, digambar sebagai *compound boundary boxes*
 
 Graph interaktif: pan/zoom, ganti layout (Dagre/ELK/Breadthfirst/Circle/Grid),
 klik node → sidebar detail, seleksi meredupkan elemen tak terkait, toggle L3.
-Bar **Filter** di bawah toolbar memotong graf per domain, per level, atau hanya
-node ber-Catatan (melengkapi pencarian teks). Saat tak ada node terpilih, sidebar
+Menu **Filter** di bawah toolbar memotong graf per domain, per level, atau hanya
+node ber-Catatan (melengkapi pencarian teks). Satu tombol **Filter** dengan badge
+jumlah aktif membuka panel berisi seksi Domain / Level / Catatan; filter aktif
+tampil sebagai chip yang bisa dihapus di desktop dan ringkas jadi badge di mobile
+— tanpa scroll horizontal di lebar layar mana pun. Saat tak ada node terpilih, sidebar
 menampilkan panel **Insight** — analisis turunan dari graf relasi data: **hub**
 (fitur paling banyak dihubungkan), **coupling lintas-modul**, dan fitur
 **terisolasi**. Panel ini satu sumber dengan `dist/graph.json` (lihat §Analisis).
