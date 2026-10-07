@@ -152,9 +152,15 @@ dihitung dari data, lalu content boleh menimpa lewat simbol opsional.
   **artefak nyata** diturunkan dari data (modul awal, fitur+route, katalog field,
   relasi data); content dapat menimpanya lewat `DOCS: [{ kind, items }]`.
 
-**Mode Alur:** tombol "Alur" di kanan-bawah kanvas menyorot rantai fitur
-end-to-end dari `DATA_EDGES`; sidebar menampilkan langkah berurutan + field
-penghubung (`via <field>`) dengan navigasi Sebelumnya/Berikutnya.
+**Mode Alur:** tombol "Alur" di kanan-bawah kanvas menyorot sub-grafik relasi
+data end-to-end dari `DATA_EDGES`. `buildFlow()` menelusuri **semua cabang** —
+seluruh node hulu (yang punya jalur menuju fitur terpilih) + fitur itu + seluruh
+node hilir (yang dicapai darinya) — lalu mengurutkannya secara topologis. Sidebar
+menampilkan daftar langkah itu: field penghubung masuk (`↳ via <field>`, bisa
+lebih dari satu) dan badge `⇉N` pada langkah yang punya N cabang keluar. (Versi
+lama menelusuri greedy satu cabang saja, sehingga percabangan seperti
+`orders → invoices` **dan** `orders → shipments` tak terlihat.) Navigasi
+Sebelumnya/Berikutnya mengikuti urutan topologis tersebut.
 
 Bahasa visualnya satu warna: node jalur **dan** panah sama-sama memakai warna
 `highlight` dari palet tema, jadi jalur terbaca sebagai satu kesatuan — bukan
@@ -163,7 +169,7 @@ Bahasa visualnya satu warna: node jalur **dan** panah sama-sama memakai warna
 | Kelas | Arti | Penanda visual |
 |---|---|---|
 | `node.flow` | node ikut jalur Alur | border warna `highlight`, tebal 4, label bold |
-| `edge.chain` | edge antar-langkah **berurutan** | tebal 3.5, panah 1.5×, warna `highlight` |
+| `edge.chain` | edge yang **kedua ujungnya** di jalur Alur | tebal 3.5, panah 1.5×, warna `highlight` |
 | `node.anchor` | langkah yang **sedang dipilih** | border putih (5) + halo underlay |
 | `node.noted` | node punya catatan | irisan pie `noteColor` di sudut node |
 | `node.match` / `.faded` | hasil pencarian / di luar konteks | border amber / opacity turun |

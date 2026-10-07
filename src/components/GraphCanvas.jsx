@@ -31,14 +31,13 @@ export function toElements(nodes, edges, domains = {}) {
   };
 }
 
-/** Tandai edge antar-langkah berurutan pada jalur Alur (garis lebih tebal,
- *  panah lebih besar) agar arah alur terbaca, bukan sekadar "semua menyala". */
+/** Tandai edge yang kedua ujungnya ada di jalur Alur (semua cabang, bukan
+ *  hanya berurutan indeks) — garis lebih tebal, panah lebih besar, agar
+ *  jalur terbaca sebagai satu kesatuan, bukan sekadar "semua menyala". */
 function markChainEdges(cy, flowPath) {
-  const pos = new Map(flowPath.map((id, i) => [id, i]));
+  const ids = new Set(flowPath);
   cy.edges().forEach((e) => {
-    const s = pos.get(e.data('source'));
-    const t = pos.get(e.data('target'));
-    if (s !== undefined && t !== undefined && Math.abs(s - t) === 1) e.addClass('chain');
+    if (ids.has(e.data('source')) && ids.has(e.data('target'))) e.addClass('chain');
   });
 }
 

@@ -18,41 +18,70 @@ import * as C from './content.js';
 
 const APP = C.APP || { name: 'Dyalisis', subtitle: 'Feature Analysis Graph' };
 
-// Bangun jalur alur data end-to-end dari DATA_EDGES: telusuri ke hulu (edges
-// yang menunjuk node) lalu ke hilir, tanpa mengunjungi node dua kali.
+// Bangun sub-grafik Alur end-to-end dari DATA_EDGES — SEMUA cabang, bukan satu
+// jalur greedy. Kumpulkan node hulu (yang punya jalur menuju start) + start +
+// node hilir (yang dicapai dari start); edge yang kedua ujungnya termasuk
+// dianggap bagian alur. Urutan langkahnya topologis (paling hulu dulu), jadi
+// percabangan seperti orders → invoices DAN orders → shipments tetap terlihat.
 function buildFlow(startId, dataEdges) {
+  const edges = dataEdges || [];
   const outMap = {};
   const inMap = {};
-  (dataEdges || []).forEach(([s, t, f]) => {
-    (outMap[s] = outMap[s] || []).push({ to: t, field: f });
-    (inMap[t] = inMap[t] || []).push({ from: s, field: f });
+  edges.forEach(([s, t]) => {
+    (outMap[s] = outMap[s] || []).push(t);
+    (inMap[t] = inMap[t] || []).push(s);
   });
-  const seen = new Set([startId]);
-  const back = [];
-  let cur = startId;
-  while (inMap[cur]) {
-    const nxt = inMap[cur].find((e) => !seen.has(e.from));
-    if (!nxt) break;
-    back.unshift(nxt.from);
-    seen.add(nxt.from);
-    cur = nxt.from;
-  }
-  const fwd = [];
-  cur = startId;
-  while (outMap[cur]) {
-    const nxt = outMap[cur].find((e) => !seen.has(e.to));
-    if (!nxt) break;
-    fwd.push(nxt.to);
-    seen.add(nxt.to);
-    cur = nxt.to;
-  }
-  return [...back, startId, ...fwd];
-}
 
-// Field penghubung antara dua fitur berurutan (untuk label di Alur).
-function edgeField(fromId, toId, dataEdges) {
-  const e = (dataEdges || []).find(([s, t]) => s === fromId && t === toId);
-  return e ? e[2] : null;
+  // Hulu: telusuri mundur dari start lewat inMap.
+  const up = new Set();
+  const upStack = [startId];
+  while (upStack.length) {
+    const cur = upStack.pop();
+    for (const from of inMap[cur] || []) {
+      if (from !== startId && !up.has(from)) { up.add(from); upStack.push(from); }
+    }
+  }
+  // Hilir: telusuri maju dari start lewat outMap.
+  const down = new Set();
+  const downStack = [startId];
+  while (downStack.length) {
+    const cur = downStack.pop();
+    for (const to of outMap[cur] || []) {
+      if (to !== startId && !down.has(to)) { down.add(to); downStack.push(to); }
+    }
+  }
+  const nodeSet = new Set([...up, startId, ...down]);
+
+  // Edge alur: kedua ujungnya termasuk sub-grafik.
+  const flowEdges = edges.filter(([s, t]) => nodeSet.has(s) && nodeSet.has(t));
+
+  // Urutan topologis (Kahn) memakai edge alur; node bersisa disusul apa adanya
+  // (mis. bagian siklik yang derajat-masuknya tak pernah nol).
+  const indeg = {};
+  nodeSet.forEach((id) => { indeg[id] = 0; });
+  flowEdges.forEach(([, t]) => { indeg[t] = (indeg[t] || 0) + 1; });
+  const outFlow = {};
+  flowEdges.forEach(([s, t]) => { (outFlow[s] = outFlow[s] || []).push(t); });
+  const order = [];
+  const seen = new Set();
+  let layer = [...nodeSet].filter((id) => !indeg[id]);
+  if (!layer.length) layer = [startId];
+  while (layer.length) {
+    const next = [];
+    for (const id of layer) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      order.push(id);
+      for (const t of outFlow[id] || []) {
+        indeg[t]--;
+        if (indeg[t] <= 0 && !seen.has(t)) next.push(t);
+      }
+    }
+    layer = next;
+  }
+  nodeSet.forEach((id) => { if (!seen.has(id)) order.push(id); });
+
+  return { nodes: order, edges: flowEdges, startId };
 }
 
 export default function DyalisisApp() {
@@ -178,11 +207,25 @@ export default function DyalisisApp() {
     [umlNode, allNodes]
   );
 
-  // Mode Alur: dari fitur terpilih, telusuri rantai relasi data end-to-end.
-  const flowPath = React.useMemo(() => {
-    if (!flowMode || !selected || selected.type !== 'feature') return [];
+  // Mode Alur: dari fitur terpilih, susun sub-grafik relasi data end-to-end
+  // (SEMUA cabang, bukan satu jalur greedy). Lihat buildFlow().
+  const flow = React.useMemo(() => {
+    if (!flowMode || !selected || selected.type !== 'feature') return { nodes: [], edges: [] };
     return buildFlow(selected.id, C.DATA_EDGES || []);
   }, [flowMode, selected]);
+  const flowPath = flow.nodes;
+
+  // Peta field masuk & jumlah cabang keluar per node, untuk label daftar Alur.
+  const flowIncoming = React.useMemo(() => {
+    const m = {};
+    flow.edges.forEach(([, t, f]) => { (m[t] = m[t] || []).push(f); });
+    return m;
+  }, [flow]);
+  const flowOutgoing = React.useMemo(() => {
+    const m = {};
+    flow.edges.forEach(([s]) => { m[s] = (m[s] || 0) + 1; });
+    return m;
+  }, [flow]);
 
   // Set node yang di-highlight di graph: pencarian menang, lalu mode Alur.
   const highlightIds = React.useMemo(() => {
@@ -479,17 +522,22 @@ export default function DyalisisApp() {
                     <div className="space-y-1">
                       {flowPath.map((id, i) => {
                         const n = byIdAll[id];
-                        const linkField = i > 0 ? edgeField(flowPath[i - 1], id, C.DATA_EDGES) : null;
+                        const inFields = flowIncoming[id] || [];
+                        const outs = flowOutgoing[id] || 0;
                         return (
                           <React.Fragment key={id}>
-                            {linkField && (
-                              <p className="pl-6 text-[9px] italic text-muted-foreground">↳ via {linkField}</p>
+                            {inFields.length > 0 && (
+                              <p className="pl-6 text-[9px] italic text-muted-foreground">↳ via {inFields.join(', ')}</p>
                             )}
                             <button className={cn('flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-muted',
                               id === selectedId && 'bg-muted font-medium')}
                               onClick={() => selectNode(id)}>
                               <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] text-muted-foreground">{i + 1}</span>
                               <span className="flex-1 truncate">{n ? n.label : id}</span>
+                              {outs > 1 && (
+                                <span className="shrink-0 rounded bg-amber-500/15 px-1 text-[9px] font-semibold text-amber-600 dark:text-amber-400"
+                                  title={`${outs} cabang keluar`}>⇉{outs}</span>
+                              )}
                               {notes[id] && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-pink-400" title="punya catatan" />}
                             </button>
                           </React.Fragment>
