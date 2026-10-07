@@ -4,11 +4,13 @@ import { Button, Card, CardContent, Badge, Input } from './components/ui.jsx';
 import { LAYOUT_DEFS, DEFAULT_LAYOUT } from './lib/layouts.js';
 import { graphPalette } from './lib/graph-style.js';
 import { buildActivePath } from './lib/flow.js';
+import { analyze, noteInfo } from './lib/analysis.js';
 import { cn } from './lib/utils.js';
 import GraphCanvas from './components/GraphCanvas.jsx';
 import Legend from './components/Legend.jsx';
 import UmlDiagram from './components/UmlDiagram.jsx';
 import DocsPanel from './components/DocsPanel.jsx';
+import InsightPanel from './components/InsightPanel.jsx';
 import {
   IconPlus, IconMinus, IconFit, IconDownload, IconSun, IconMoon,
   IconSearch, IconPanel, IconChevron, IconArrowRight, IconArrowLeft, IconTarget,
@@ -40,6 +42,11 @@ export default function DyalisisApp() {
   const [flowStart, setFlowStart] = React.useState(null);       // fitur awal jalur Alur
   const [branchChoice, setBranchChoice] = React.useState({});   // { nodeId: successorId }
   const [docsOpen, setDocsOpen] = React.useState(false);
+  // Filter facet — potong graf per domain, per level, atau hanya node ber-Catatan.
+  // Melengkapi pencarian teks: facet berlaku lebih dulu, lalu query mempersempit.
+  const [facetDomain, setFacetDomain] = React.useState(null);
+  const [facetLevel, setFacetLevel] = React.useState(null);
+  const [facetNoted, setFacetNoted] = React.useState(false);
   const searchRef = React.useRef(null);
   const layoutMenuRef = React.useRef(null);
 
@@ -67,36 +74,62 @@ export default function DyalisisApp() {
   }, []);
   const byIdAll = React.useMemo(() => Object.fromEntries(allNodes.map((n) => [n.id, n])), [allNodes]);
 
+  // Analisis graf turunan (hub/chokepoint, coupling lintas-modul, terisolasi).
+  // Sama dengan yang mengisi dist/graph.json — dihitung sekali karena content statis.
+  const insight = React.useMemo(() => analyze(C), []);
+
   // Toggle L3 (aksi) — default disembunyikan agar compound view bersih seperti C4.
   const nodes = React.useMemo(
     () => (showActions ? allNodes : allNodes.filter((n) => n.type !== 'action')),
     [allNodes, showActions]
   );
 
-  // Hasil pencarian (untuk highlight di graph + state kosong).
-  const matchIds = React.useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return nodes
-      .filter((n) => (n.label || '').toLowerCase().includes(q) || (n.fields || '').toLowerCase().includes(q))
-      .map((n) => n.id);
-  }, [query, nodes]);
-
-  // Search: node yang match + seluruh ancestor-nya (agar compound tidak orphan).
-  const filteredNodes = React.useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return nodes;
+  // Filter facet: node yang lolos domain/level/catatan + seluruh ancestor-nya
+  // (agar compound tidak orphan — pola sama seperti pencarian di bawah).
+  const hasFacets = facetDomain != null || facetLevel != null || facetNoted;
+  const facetedNodes = React.useMemo(() => {
+    if (!hasFacets) return nodes;
     const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
+    const effDomain = (n) => n.domain || (byId[n.parent] && byId[n.parent].domain);
     const keep = new Set();
     nodes.forEach((n) => {
-      if ((n.label || '').toLowerCase().includes(q) || (n.fields || '').toLowerCase().includes(q)) {
+      const ok =
+        (facetDomain == null || effDomain(n) === facetDomain) &&
+        (facetLevel == null || n.level === facetLevel) &&
+        (!facetNoted || !!notes[n.id]);
+      if (ok) {
         keep.add(n.id);
         let p = n.parent;
         while (p) { keep.add(p); p = byId[p] && byId[p].parent; }
       }
     });
     return nodes.filter((n) => keep.has(n.id));
-  }, [query, nodes]);
+  }, [nodes, facetDomain, facetLevel, facetNoted, hasFacets, notes]);
+
+  // Hasil pencarian (untuk highlight di graph + state kosong).
+  const matchIds = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return facetedNodes
+      .filter((n) => (n.label || '').toLowerCase().includes(q) || (n.fields || '').toLowerCase().includes(q))
+      .map((n) => n.id);
+  }, [query, facetedNodes]);
+
+  // Search: node yang match + seluruh ancestor-nya (agar compound tidak orphan).
+  const filteredNodes = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return facetedNodes;
+    const byId = Object.fromEntries(facetedNodes.map((n) => [n.id, n]));
+    const keep = new Set();
+    facetedNodes.forEach((n) => {
+      if ((n.label || '').toLowerCase().includes(q) || (n.fields || '').toLowerCase().includes(q)) {
+        keep.add(n.id);
+        let p = n.parent;
+        while (p) { keep.add(p); p = byId[p] && byId[p].parent; }
+      }
+    });
+    return facetedNodes.filter((n) => keep.has(n.id));
+  }, [query, facetedNodes]);
 
   const visibleIds = React.useMemo(() => new Set(filteredNodes.map((n) => n.id)), [filteredNodes]);
   const edges = React.useMemo(
@@ -214,8 +247,11 @@ export default function DyalisisApp() {
     if (!node) return;
     if (node.type === 'action' && !showActions) setShowActions(true);
     if (query && !visibleIds.has(id)) setQuery('');
+    if (hasFacets && !visibleIds.has(id)) {
+      setFacetDomain(null); setFacetLevel(null); setFacetNoted(false);
+    }
     setSelectedId(id);
-  }, [byIdAll, showActions, query, visibleIds]);
+  }, [byIdAll, showActions, query, visibleIds, hasFacets]);
 
   // Tap pada kanvas: klik latar (id null) membersihkan seleksi sekaligus
   // melepas mode Alur, supaya fokus jalur tidak menggantung saat pengguna
@@ -301,7 +337,11 @@ export default function DyalisisApp() {
     a.click();
   };
 
-  const emptySearch = !!query.trim() && matchIds.length === 0;
+  const noFacetMatch = hasFacets && facetedNodes.length === 0;
+  const emptySearch = (!!query.trim() && matchIds.length === 0) || noFacetMatch;
+
+  // Catatan node terpilih (teks + provenance) — dinormalkan lewat helper engine.
+  const selectedNote = selected ? noteInfo(notes, selected.id) : { text: null, provenance: null };
 
   return (
     <div className="flex h-full flex-col">
@@ -351,6 +391,38 @@ export default function DyalisisApp() {
           </div>
           <Button size="sm" variant="outline" className="shrink-0 gap-1" onClick={exportPng}><IconDownload /><span className="hidden sm:inline">PNG</span></Button>
         </div>
+      </div>
+
+      {/* Filter facet — potong graf per domain / level / Catatan. */}
+      <div className="flex items-center gap-1.5 overflow-x-auto border-b bg-card/30 px-3 py-1.5 text-[11px] sm:px-4">
+        <span className="shrink-0 text-muted-foreground">Filter</span>
+        {Object.entries(domains).map(([key, dv]) => (
+          <button key={key}
+            className={cn('inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 transition-colors',
+              facetDomain === key ? 'bg-accent font-medium' : 'hover:bg-accent/50')}
+            onClick={() => setFacetDomain(facetDomain === key ? null : key)}>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: dv.color }} />
+            {dv.label}
+          </button>
+        ))}
+        <span className="mx-0.5 h-3 w-px shrink-0 bg-border" />
+        {[[1, 'Modul'], [2, 'Fitur'], [3, 'Aksi']].map(([lv, label]) => (
+          <button key={lv}
+            className={cn('shrink-0 rounded-full border px-2 py-0.5 transition-colors',
+              facetLevel === lv ? 'bg-accent font-medium' : 'hover:bg-accent/50')}
+            onClick={() => { const next = facetLevel === lv ? null : lv; setFacetLevel(next); if (next === 3) setShowActions(true); }}>
+            {label}
+          </button>
+        ))}
+        <span className="mx-0.5 h-3 w-px shrink-0 bg-border" />
+        <button
+          className={cn('shrink-0 rounded-full border px-2 py-0.5 transition-colors',
+            facetNoted ? 'bg-accent font-medium' : 'hover:bg-accent/50')}
+          onClick={() => setFacetNoted((v) => !v)}>Ber-Catatan</button>
+        {hasFacets && (
+          <button className="shrink-0 rounded-full px-2 py-0.5 text-muted-foreground underline hover:text-foreground"
+            onClick={() => { setFacetDomain(null); setFacetLevel(null); setFacetNoted(false); }}>Reset</button>
+        )}
       </div>
 
       <div className="flex min-h-0 flex-1">
@@ -423,8 +495,15 @@ export default function DyalisisApp() {
             <div className="flex min-h-[220px] flex-col items-center justify-center gap-2 p-6 text-center">
               <IconSearch className="h-8 w-8 text-muted-foreground" />
               <p className="text-sm font-medium">Tidak ada fitur cocok</p>
-              <p className="text-xs text-muted-foreground">Tidak ada fitur atau field yang mengandung “{query.trim()}”.</p>
-              <Button size="sm" variant="outline" onClick={() => setQuery('')}>Bersihkan</Button>
+              <p className="text-xs text-muted-foreground">
+                {query.trim()
+                  ? <>Tidak ada fitur atau field yang mengandung “{query.trim()}”.</>
+                  : <>Tidak ada node yang cocok dengan filter aktif.</>}
+              </p>
+              <Button size="sm" variant="outline"
+                onClick={() => { setQuery(''); setFacetDomain(null); setFacetLevel(null); setFacetNoted(false); }}>
+                Bersihkan
+              </Button>
             </div>
           ) : selected ? (
             <Card>
@@ -482,13 +561,22 @@ export default function DyalisisApp() {
                     tak terlihat di graph (alasan bisnis, jebakan integrasi)
                     ditandai di content, lalu tampil di sini apa adanya. Tidak ada
                     input atau penyimpanan; ubah di content lalu build ulang. */}
-                {notes[selected.id] && (
+                {selectedNote.text != null && (
                   <div>
-                    <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="mb-1 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                       Catatan node
+                      <span className={cn('rounded px-1 py-px text-[9px] font-medium normal-case tracking-normal',
+                        selectedNote.provenance === 'inferred'
+                          ? 'bg-amber-400/15 text-amber-600 dark:text-amber-400'
+                          : 'bg-sky-400/15 text-sky-600 dark:text-sky-400')}
+                        title={selectedNote.provenance === 'inferred'
+                          ? 'Disimpulkan (bukan kutipan langsung dari dokumen)'
+                          : 'Berdasar dokumen/spec'}>
+                        {selectedNote.provenance}
+                      </span>
                     </p>
                     <p className="whitespace-pre-wrap rounded-md border border-pink-400/40 bg-pink-400/5 px-2 py-1.5 text-xs leading-relaxed">
-                      {notes[selected.id]}
+                      {selectedNote.text}
                     </p>
                   </div>
                 )}
@@ -585,6 +673,7 @@ export default function DyalisisApp() {
             </Card>
           ) : (
             <div className="space-y-4">
+              <InsightPanel analysis={insight} domains={domains} byId={byIdAll} onSelect={selectNode} />
               <p className="text-xs leading-relaxed text-muted-foreground">
                 Graph memetakan aplikasi dalam empat tingkat: <b>Aplikasi</b> (root) berisi
                 <b> Modul</b> (domain fungsional), tiap modul berisi <b>Fitur</b>, dan tiap fitur

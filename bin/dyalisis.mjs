@@ -7,6 +7,7 @@
 //   publish [--slug nama] [--url u] [--token t] [--overwrite] [--no-build]
 //   list   [--remote]                riwayat publish (manifest lokal / server)
 //   serve   [--port n] [--data dir] [--token t]   jalankan publish server lokal
+//   serve   --mcp [--content f]                   graf fitur sebagai tool MCP (stdio)
 // Engine & build tool hidup di paket ini; content hidup di proyek pemakai.
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
@@ -33,6 +34,8 @@ Pemakaian:
   npx dyalisis list [--remote] [--url u]       riwayat publikasi (lokal/server)
   npx dyalisis serve [--port n] [--data dir] [--token t]
                                                jalankan publish server lokal
+  npx dyalisis serve --mcp                     ekspos graf fitur sebagai MCP
+                                               (stdio) untuk agent
 
 Config publish (mis. .dyalisisrc.json): { "publishUrl", "publishToken", "handle" }
 Atau env: DYALISIS_PUBLISH_URL, DYALISIS_TOKEN.
@@ -86,6 +89,13 @@ async function main() {
   }
 
   if (cmd === 'serve') {
+    // `serve --mcp` mengekspos graf fitur sebagai tool MCP (stdio) untuk agent;
+    // tanpa flag itu, tetap menjalankan publish server HTTP seperti semula.
+    if (rest.includes('--mcp')) {
+      const { startMcp } = await import(lib('lib/mcp.mjs'));
+      await startMcp({ content: flagValue(rest, '--content') });
+      return;
+    }
     const { startServer } = await import(lib('server/publish-server.mjs'));
     startServer({
       port: flagValue(rest, '--port'),

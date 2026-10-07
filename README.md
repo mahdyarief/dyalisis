@@ -22,6 +22,11 @@ Dekomposisi fungsional 4 tingkat, digambar sebagai *compound boundary boxes*
 
 Graph interaktif: pan/zoom, ganti layout (Dagre/ELK/Breadthfirst/Circle/Grid),
 klik node → sidebar detail, seleksi meredupkan elemen tak terkait, toggle L3.
+Bar **Filter** di bawah toolbar memotong graf per domain, per level, atau hanya
+node ber-Catatan (melengkapi pencarian teks). Saat tak ada node terpilih, sidebar
+menampilkan panel **Insight** — analisis turunan dari graf relasi data: **hub**
+(fitur paling banyak dihubungkan), **coupling lintas-modul**, dan fitur
+**terisolasi**. Panel ini satu sumber dengan `dist/graph.json` (lihat §Analisis).
 Tiap node punya **UML class diagram** di sidebar (atribut dari field kunci,
 operasi dari aksi, asosiasi berlabel field penghubung) — digambar sebagai SVG
 inline, theme-aware, tanpa dependency tambahan. Klik diagram → **modal perbesar**.
@@ -47,8 +52,8 @@ Pakai sebagai framework npm — buat proyek content baru, lalu isi data aplikasi
 npx dyalisis init aplikasi-saya   # scaffold folder proyek content
 cd aplikasi-saya
 npm install
-npx dyalisis test                 # 30 self-check headless → harus semua PASS
-npx dyalisis build                # → dist/index.html (single-file, offline)
+npx dyalisis test                 # 46 self-check headless → harus semua PASS
+npx dyalisis build                # → dist/index.html + dist/graph.json
 ```
 
 Buka `dist/index.html` di browser. AI agent cukup menyunting `dyalisis.content.js`
@@ -58,8 +63,8 @@ Buka `dist/index.html` di browser. AI agent cukup menyunting `dyalisis.content.j
 
 1. `npx dyalisis init <nama-app>` → folder proyek + `dyalisis.content.js` (stub).
 2. Isi `dyalisis.content.js` sesuai kontrak (§ Content contract di bawah).
-3. `npx dyalisis test` → harus **30/30 PASS**.
-4. `npx dyalisis build` → `dist/index.html`.
+3. `npx dyalisis test` → harus **46/46 PASS**.
+4. `npx dyalisis build` → `dist/index.html` (+ `dist/graph.json`).
 
 ## Publish ke domain (opsional)
 
@@ -112,20 +117,42 @@ Satu modul ES mengekspor: `APP`, `DOMAINS`, `ROOT`, `MODULES`, `NODES`, `ACTIONS
 
 Opsional (memperkaya panel Dokumentasi + catatan): `DECISIONS` (ADR), `ARC42`
 (override narasi seksi), `GLOSSARY` (glosarium), `DOCS` (artefak Diátaxis),
-`NOTES` (seed catatan per node: `{ idNode: 'catatan kritis...' }`).
+`NOTES` (catatan per node: `{ idNode: 'catatan kritis...' }` atau
+`{ idNode: { text, provenance } }` dengan provenance `spec` | `inferred`).
 
 Aturan wajib: id unik, parent valid tanpa siklus, `MODULES[i].id` = `mod-<domain>`,
 tiap modul ≥1 fitur, tiap fitur ≥1 aksi, semua `domain` terdaftar di `DOMAINS`.
+
+## Analisis & graph.json (opsional)
+
+Selain `dist/index.html`, `build` juga menulis **`dist/graph.json`** — model
+ternormalisasi (node + edge + blok `analysis`) yang bisa di-query ulang tanpa
+browser, di-diff antar-build, atau dibaca tool lain. Turunannya dihitung oleh
+`src/lib/analysis.js` (fungsi murni, isomorphic — dipakai build, UI, test, MCP):
+
+- **God nodes / chokepoint** — fitur dengan derajat tertinggi pada `DATA_EDGES`.
+- **Coupling lintas-modul** — relasi data yang melintasi batas modul.
+- **Fitur terisolasi** — fitur tanpa satu pun relasi data.
+- **Provenance catatan** — hitungan catatan `inferred`.
+
+## MCP server (opsional)
+
+`npx dyalisis serve --mcp` menjalankan server **MCP stdio** (JSON-RPC 2.0, tanpa
+dependency) yang mengekspos graf fitur sebagai tool untuk agent:
+`graph_summary`, `list_modules`, `get_node`, `search_nodes`, `get_notes`,
+`trace_flow`. Content di-resolve sama seperti `build` (dari cwd), jadi bisa
+dijalankan di dalam proyek content mana pun. Self-test: `npm run test:mcp`.
 
 ## Struktur
 
 ```
 bin/dyalisis.mjs  CLI (init/build/test/publish/serve/login/list)
-build.mjs         bundler → single HTML   src/index.jsx       app React
+build.mjs         bundler → HTML+graph.json  src/index.jsx     app React
 lib/scaffold.mjs  scaffolder proyek        src/components/     GraphCanvas + ui/*
-lib/patch-elk.mjs patch cytoscape-elk      src/lib/            preset layout + flow
-lib/publish.mjs   client publish           test/run.mjs        self-test (30)
-lib/slug.mjs      slug unik bersama        test/publish.mjs    self-test publish
+lib/patch-elk.mjs patch cytoscape-elk      src/lib/            layout + flow + analysis
+lib/publish.mjs   client publish           test/run.mjs        self-test (46)
+lib/slug.mjs      slug unik bersama        test/mcp.mjs        self-test MCP
+lib/mcp.mjs       server MCP stdio         test/publish.mjs    self-test publish
 server/           publish server (zero-dep, tanpa DB)
 src/data/         contoh content           template.html       shell HTML
 ```

@@ -63,9 +63,15 @@ export const GLOSSARY = [
 ];
 // Catatan per node (opsional) — ditampilkan sebagai VIEW baca-saja (jembatan
 // Manusia↔AI). Tandai info kritis di sini; tampil di sidebar + badge pada node.
+// Nilai boleh string (dianggap provenance 'spec') atau { text, provenance }
+// dengan provenance 'spec' (berdasar dokumen) | 'inferred' (hasil simpulan).
 export const NOTES = {
   orders: 'Sumber kebenaran status pesanan. Pembatalan tidak menghapus invoice yang sudah terbit — hanya menandai.',
-  inventory: 'Stok berkurang dari DUA jalur (shipment & invoice). Selalu uji keduanya saat mengubah logika stok.'
+  inventory: 'Stok berkurang dari DUA jalur (shipment & invoice). Selalu uji keduanya saat mengubah logika stok.',
+  shipments: {
+    text: 'Status pengiriman tampak disinkronkan lewat job terjadwal; belum terkonfirmasi di dokumen.',
+    provenance: 'inferred'
+  }
 };
 export const LEVELS = { 0: ['app'], 1: MODULES.map((m) => m.id), 2: NODES.map((n) => n.id), 3: ACTIONS.map((a) => a.id) };
 export const LEVEL_NAMES = { 0: 'Aplikasi', 1: 'Modul', 2: 'Fitur', 3: 'Aksi' };

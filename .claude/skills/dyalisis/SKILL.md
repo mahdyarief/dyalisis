@@ -67,8 +67,8 @@ Dipakai sebagai framework npm — scaffold proyek content baru:
 npx dyalisis init aplikasi-saya   # folder proyek + dyalisis.content.js (stub)
 cd aplikasi-saya
 npm install
-npx dyalisis test                 # 30 self-check headless → semua PASS
-npx dyalisis build                # → dist/index.html (single-file, offline)
+npx dyalisis test                 # 46 self-check headless → semua PASS
+npx dyalisis build                # → dist/index.html + dist/graph.json
 ```
 
 Untuk aplikasi nyata, cukup sunting `dyalisis.content.js` lalu ulangi
@@ -121,10 +121,12 @@ export const DECISIONS = [{ title, status, context, decision }]; // ADR (arc42 �
 export const ARC42     = [{ no: 2, body: '...' }];               // override narasi seksi arc42 (1–12)
 export const GLOSSARY  = [{ term, definition }];                 // glosarium (arc42 §12)
 export const DOCS      = [{ kind: 'How-to', items: ['...'] }];   // artefak Diátaxis (menimpa turunan)
-export const NOTES     = { idNode: 'catatan kritis...' };        // seed catatan per node
+export const NOTES     = { idNode: 'catatan kritis...' };        // catatan per node
+// Nilai NOTES boleh string (provenance 'spec') atau { text, provenance } dengan
+// provenance 'spec' (berdasar dokumen) | 'inferred' (hasil simpulan).
 ```
 
-**Aturan struktur yang diuji `npm test` (30 check):**
+**Aturan struktur yang diuji `npm test` (46 check):**
 - `id` unik di seluruh node.
 - `parent` tiap node merujuk id yang ada; **tanpa siklus**.
 - `MODULES[i].id` **harus** `mod-<domain>` — engine menurunkan parent fitur dari
@@ -140,6 +142,11 @@ export const NOTES     = { idNode: 'catatan kritis...' };        // seed catatan
 - Bahasa visual diuji lewat resolusi selector cytoscape: `node.flow` border =
   `highlight`, `node.anchor` menang atas `flow`, `edge.chain` lebih tebal dari
   edge biasa, `node.noted` memakai `pie-1-background-size` kecil.
+- Analisis graf (`src/lib/analysis.js`) menguji turunan dari data: `buildModel`
+  jumlah node cocok content, sigma derajat = 2×edge data, `godNodes` urut menurun
+  & hanya fitur, `crossModuleLinks` selalu lintas domain, `isolatedFeatures` tak
+  tersentuh `DATA_EDGES`, `toGraphJson` serializable, dan provenance `noteInfo`
+  ternormalisasi ke `{ text, provenance }` (spec|inferred).
 
 **UML class diagram (otomatis dari data):** komponen `UmlDiagram.jsx` mengubah
 `fields` (CSV) jadi atribut kelas, anak node jadi operasi, dan `DATA_EDGES` yang
@@ -197,12 +204,14 @@ Berikutnya, bukan klik pada kanvas.
 
 **Catatan node (jembatan Manusia↔AI):** tiap node bisa membawa catatan kritis
 — aturan bisnis tak tertulis, jebakan integrasi, alasan sebuah keputusan — lewat
-simbol opsional `NOTES` (`{ idNode: 'teks' }`). Ini murni **view baca-saja**:
-framework hanya menampilkan informasi yang Anda tandai di content, tanpa input,
-tanpa penyimpanan, tanpa `localStorage`. Untuk mengubahnya, sunting `NOTES` lalu
-build ulang — sehingga kurasi penulis/AI selalu ikut terbawa ke artefak.
-Penandanya: badge pie pada node, hitungan di legenda, dan dot pada daftar
-langkah Alur.
+simbol opsional `NOTES`. Nilai boleh string (provenance `spec`) atau objek
+`{ text, provenance }` dengan provenance `spec` (berdasar dokumen) atau
+`inferred` (hasil simpulan) — pembaca tahu mana fakta dokumen dan mana dugaan.
+Ini murni **view baca-saja**: framework hanya menampilkan informasi yang Anda
+tandai di content, tanpa input, tanpa penyimpanan, tanpa `localStorage`. Untuk
+mengubahnya, sunting `NOTES` lalu build ulang — sehingga kurasi penulis/AI selalu
+ikut terbawa ke artefak. Penandanya: badge pie pada node, hitungan di legenda,
+dot pada daftar langkah Alur, dan badge teks `spec`/`inferred` di sidebar.
 
 ## 5. Menambah aplikasi baru (langkah)
 
@@ -211,8 +220,8 @@ langkah Alur.
 2. Isi `APP`, `DOMAINS` (label + warna), `ROOT`, `MODULES`, `NODES`, lalu
    `ACTION_DEFS` (map `idFitur → [label aksi...]`) dan turunkan `ACTIONS`.
 3. Tulis `DATA_EDGES` = relasi data antar-fitur `[dari, ke, field_kunci]`.
-4. Jalankan `npx dyalisis test` → harus 30/30 PASS.
-5. `npx dyalisis build` → `dist/index.html`.
+4. Jalankan `npx dyalisis test` → harus 46/46 PASS.
+5. `npx dyalisis build` → `dist/index.html` (+ `dist/graph.json`).
 
 **Tips model:** domain = kelompok fungsional (bukan tim). Fitur = fungsi utama
 yang punya route/menu sendiri. Aksi = operasi/tombol/route di dalam fitur.

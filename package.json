@@ -35,7 +35,9 @@
     "build": "node bin/dyalisis.mjs build",
     "test": "node bin/dyalisis.mjs test",
     "test:publish": "node test/publish.mjs",
+    "test:mcp": "node test/mcp.mjs",
     "serve": "node bin/dyalisis.mjs serve",
+    "serve:mcp": "node bin/dyalisis.mjs serve --mcp",
     "patch-elk": "node scripts/patch-elk.mjs"
   },
   "dependencies": {

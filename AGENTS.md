@@ -9,11 +9,12 @@ lengkapnya ada di **`.claude/skills/dyalisis/SKILL.md`** — baca itu dulu.
 
 ```bash
 npx dyalisis init <nama-app>   # scaffold proyek content baru (folder + stub)
-npx dyalisis test              # 30 self-check headless, harus hijau
-npx dyalisis build             # → dist/index.html (single-file, offline)
+npx dyalisis test              # 46 self-check headless, harus hijau
+npx dyalisis build             # → dist/index.html + dist/graph.json
 npx dyalisis login <handle>    # daftar identitas → simpan token
 npx dyalisis publish           # build + unggah → URL publik (slug unik otomatis)
 npx dyalisis list --remote     # lihat publikasi milikmu
+npx dyalisis serve --mcp       # graf fitur sebagai tool MCP (stdio) untuk agent
 ```
 
 Di repo engine ini sendiri (dev), `npm run build` / `npm test` setara; engine &
@@ -35,8 +36,8 @@ Detail lengkap: `.claude/skills/dyalisis/SKILL.md` §10.
 
 1. Pelajari aplikasi target → susun hierarki 4 level: Aplikasi → Modul → Fitur → Aksi.
 2. `npx dyalisis init <app>` → isi `dyalisis.content.js` sesuai kontrak (SKILL.md §4).
-3. `npx dyalisis test` → perbaiki sampai **30/30 PASS**.
-4. `npx dyalisis build` → hasilkan `dist/index.html`.
+3. `npx dyalisis test` → perbaiki sampai **46/46 PASS**.
+4. `npx dyalisis build` → hasilkan `dist/index.html` (+ `dist/graph.json`).
 
 ## Konvensi yang tidak boleh dilanggar
 

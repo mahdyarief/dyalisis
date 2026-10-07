@@ -25,8 +25,8 @@ ada di [`CONTRIBUTING.md`](../../../CONTRIBUTING.md).
 
 ```bash
 npm install
-npm test          # 30 self-check headless (semua PASS)
-npm run build     # → dist/index.html (demo dari src/data/example.js)
+npm test          # 46 self-check headless (semua PASS)
+npm run build     # → dist/index.html + dist/graph.json (demo dari src/data/example.js)
 ```
 
 ## Peta extension point
@@ -36,6 +36,9 @@ npm run build     # → dist/index.html (demo dari src/data/example.js)
 | Layout baru (cose, klay, …) | `src/lib/layouts.js` — `LAYOUT_DEFS` | tambah `{ label, options }`; toolbar ikut otomatis |
 | Selector/warna visual | `src/lib/graph-style.js` — `buildGraphStyle`, `graphPalette` | urutan deklarasi = prioritas; paling spesifik **terakhir** |
 | Algoritma Mode Alur | `src/lib/flow.js` — `buildActivePath` | kembalikan `{ path, edges, branches }` |
+| Analisis graf (hub/coupling/provenance) | `src/lib/analysis.js` | fungsi murni isomorphic; dipakai build + UI + test + MCP |
+| Panel Insight sidebar | `src/components/InsightPanel.jsx` | tampil saat tak ada node terpilih |
+| Server MCP | `lib/mcp.mjs` | `serve --mcp`, JSON-RPC stdio tanpa dependency |
 | Seksi Dokumentasi | `src/components/DocsPanel.jsx` | C4 / arc42 / ADR / glosarium / Diátaxis |
 | Diagram per-node | `src/components/UmlDiagram.jsx` | SVG inline, theme-aware |
 | Legenda | `src/components/Legend.jsx` | ikut saat menambah kelas visual baru |

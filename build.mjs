@@ -10,6 +10,7 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { patchElk } from './lib/patch-elk.mjs';
+import { toGraphJson } from './src/lib/analysis.js';
 
 const ENGINE_DIR = dirname(fileURLToPath(import.meta.url));
 const requireFromEngine = createRequire(pathToFileURL(resolve(ENGINE_DIR, 'package.json')));
@@ -78,6 +79,13 @@ export async function buildDyalisis({ engineDir = ENGINE_DIR, projectDir = proce
   writeFileSync(OUT, html);
   rmSync(tmp, { recursive: true, force: true });
   console.log(`[dyalisis] DONE → ${OUT} (${(html.length / 1024).toFixed(0)} KB)`);
+
+  // 4. Export graph.json (model ternormalisasi + analisis) di samping HTML.
+  //    Dipakai untuk re-query tanpa browser, diff antar-build, dan server MCP.
+  const C = await import(pathToFileURL(CONTENT).href);
+  const GRAPH_OUT = resolve(dirname(OUT), 'graph.json');
+  writeFileSync(GRAPH_OUT, JSON.stringify(toGraphJson(C), null, 2) + '\n');
+  console.log(`[dyalisis] graph   : ${GRAPH_OUT}`);
 }
 
 // CLI: `node build.mjs [--content f] [--out f]` (dipakai di repo engine).

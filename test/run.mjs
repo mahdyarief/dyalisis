@@ -43,6 +43,8 @@ const C = await import(pathToFileURL(CONTENT).href);
 // Fungsi engine asli (bukan replika) — buildActivePath & style dipakai engine.
 const { buildActivePath } = await import(pathToFileURL(resolve(ENGINE, 'src/lib/flow.js')).href);
 const { buildGraphStyle, graphPalette } = await import(pathToFileURL(resolve(ENGINE, 'src/lib/graph-style.js')).href);
+const { buildModel, degreeMap, godNodes, crossModuleLinks, isolatedFeatures, analyze, toGraphJson, noteInfo } =
+  await import(pathToFileURL(resolve(ENGINE, 'src/lib/analysis.js')).href);
 
 // Registrasi extensions (dagre/elk export berupa fungsi register).
 for (const ext of [dagre, elk]) {
@@ -243,6 +245,57 @@ function buildStyled(theme) {
   const s = n.style();
   check('kelas noted: pakai noteColor (pie)', s['pie-1-background-color'] === rgb(pal.noteColor), String(s['pie-1-background-color']));
   check('kelas noted: irisan pie kecil (<50%)', num(s['pie-1-background-size']) < 50, String(s['pie-1-background-size']));
+}
+
+// ===== Analisis graf (src/lib/analysis.js) — dipakai build & panel Insight =====
+{
+  const model = buildModel(C);
+  check('analysis: buildModel node count = node content', model.nodes.length === allNodes.length, `${model.nodes.length} vs ${allNodes.length}`);
+  check('analysis: buildModel byId memuat tiap node', model.nodes.every((n) => model.byId[n.id] === n));
+  check('analysis: tipe node dari levelOf konsisten', model.nodes.every((n) => n.type === (TYPES[levelOf(n.id)] || 'feature')));
+
+  const deg = degreeMap(model);
+  const degSum = Object.values(deg).reduce((a, d) => a + d.total, 0);
+  check('analysis: sigma derajat = 2 x edge data', degSum === 2 * (DATA_EDGES || []).length, `${degSum} vs ${2 * (DATA_EDGES || []).length}`);
+
+  const gods = godNodes(model, { top: 3 });
+  check('analysis: godNodes dibatasi top-N', gods.length <= 3, String(gods.length));
+  check('analysis: godNodes urut menurun', gods.every((g, i) => i === 0 || gods[i - 1].total >= g.total));
+  check('analysis: godNodes hanya fitur ber-derajat', gods.every((g) => g.total >= 1 && model.byId[g.id].type === 'feature'));
+
+  const xmod = crossModuleLinks(model);
+  check('analysis: crossModule selalu lintas domain', xmod.every((e) => e.fromDomain !== e.toDomain), String(xmod.length));
+
+  const isolated = isolatedFeatures(model);
+  const touched = new Set();
+  (DATA_EDGES || []).forEach(([s2, t2]) => { touched.add(s2); touched.add(t2); });
+  check('analysis: isolated tak tersentuh DATA_EDGES', isolated.every((n) => !touched.has(n.id)));
+
+  const rep = analyze(C);
+  check('analysis: counts cocok content', rep.counts.modules === MODULES.length
+    && rep.counts.features === NODES.length
+    && rep.counts.actions === ACTIONS.length
+    && rep.counts.dataEdges === (DATA_EDGES || []).length);
+
+  const gj = toGraphJson(C);
+  check('analysis: toGraphJson serializable', JSON.parse(JSON.stringify(gj)).nodes.length === allNodes.length);
+  check('analysis: toGraphJson memuat edges + analysis',
+    gj.edges.length === (C.EDGES || []).length + (DATA_EDGES || []).length && !!gj.analysis);
+
+  // Provenance catatan (spec vs inferred) — normalisasi lewat noteInfo.
+  const noteIds = Object.keys(C.NOTES || {});
+  check('analysis: noteInfo tiap catatan punya text + provenance valid',
+    noteIds.every((id) => {
+      const ni = noteInfo(C.NOTES, id);
+      return typeof ni.text === 'string' && ['spec', 'inferred'].includes(ni.provenance);
+    }));
+  check('analysis: noteInfo id tak ada → text null', noteInfo(C.NOTES, '__x__').text === null);
+  check('analysis: counts.inferred = jumlah catatan inferred',
+    rep.counts.inferred === noteIds.filter((id) => noteInfo(C.NOTES, id).provenance === 'inferred').length,
+    `${rep.counts.inferred}`);
+  check('analysis: toGraphJson menormalkan note ke { text, provenance }',
+    gj.nodes.every((n) => n.note == null
+      || (typeof n.note.text === 'string' && ['spec', 'inferred'].includes(n.note.provenance))));
 }
 
 console.log(failures === 0 ? '\nAll tests passed.' : `\n${failures} test(s) failed.`);
