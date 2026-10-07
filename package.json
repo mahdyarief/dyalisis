@@ -33,7 +33,6 @@
     "build": "node bin/dyalisis.mjs build",
     "test": "node bin/dyalisis.mjs test",
     "test:publish": "node test/publish.mjs",
-    "publish": "node bin/dyalisis.mjs publish",
     "serve": "node bin/dyalisis.mjs serve",
     "patch-elk": "node scripts/patch-elk.mjs"
   },
