@@ -51,6 +51,21 @@ function listingHtml(title, items) {
   return page(title, `<h1>${esc(title)}</h1>${rows}<p class="m">Dyalisis publish server</p>`);
 }
 
+// Suntikkan penunjuk discovery ke <head> halaman publik agar agent menemukan
+// sumber machine-readable dari URL polos. Hanya bila graph.json ada (kalau
+// tidak, target `.md`/`.json`/`llms.txt` akan 404). Idempoten.
+function withDiscovery(html, slug, hasGraph) {
+  if (!hasGraph || /rel="alternate"/.test(html)) return html;
+  const links = [
+    `<link rel="alternate" type="text/markdown" href="/${slug}.md">`,
+    `<link rel="alternate" type="application/json" href="/${slug}.json">`,
+    `<link rel="llms.txt" href="/${slug}/llms.txt">`,
+  ].join('\n');
+  return /<\/head>/i.test(html)
+    ? html.replace(/<\/head>/i, `${links}\n</head>`)
+    : `${links}\n${html}`;
+}
+
 export function createPublishServer({ dataDir, token = '', publicUrl = '' } = {}) {
   const store = createStore(dataDir || process.env.DYALISIS_DATA_DIR || './data');
   const requireToken = token || process.env.DYALISIS_PUBLISH_TOKEN || '';
@@ -189,7 +204,7 @@ export function createPublishServer({ dataDir, token = '', publicUrl = '' } = {}
         // --- Halaman: artefak publik (HTML) ---
         if (isSafeSlug(clean)) {
           const pub = store.get(clean);
-          if (pub) return send(200, pub.html, 'text/html; charset=utf-8');
+          if (pub) return send(200, withDiscovery(pub.html, clean, !!pub.graph), 'text/html; charset=utf-8');
         }
         return send(404, page('404', '<h1>404</h1><p class="m">Publikasi tak ditemukan.</p>'), 'text/html; charset=utf-8');
       }

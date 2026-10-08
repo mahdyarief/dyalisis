@@ -144,6 +144,16 @@ try {
   check('endpoint: GET /ai-app/llms.txt → indeks + pointer',
     llmsText.includes('/ai-app.json') && llmsText.includes('/ai-app/mcp'));
 
+  // Auto-discovery: HTML ber-graph disuntik <link rel="alternate"> (+ llms.txt).
+  const aiHtml = await (await get('/ai-app')).text();
+  check('discovery: HTML ber-graph → <link rel=alternate> .md + .json + llms.txt',
+    aiHtml.includes('rel="alternate" type="text/markdown" href="/ai-app.md"') &&
+    aiHtml.includes('rel="alternate" type="application/json" href="/ai-app.json"') &&
+    aiHtml.includes('/ai-app/llms.txt'));
+  // Negatif: publikasi lama tanpa graph tak disuntik (target akan 404).
+  const oldHtml = await (await get('/softmedis')).text();
+  check('discovery: HTML tanpa graph → tidak disuntik', !oldHtml.includes('rel="alternate"'));
+
   // MCP-over-HTTP (JSON-RPC via POST).
   const mcpInit = await jsonBody(await post('/ai-app/mcp', {
     headers: { 'Content-Type': 'application/json' },
