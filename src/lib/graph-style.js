@@ -37,7 +37,7 @@ const noteDot = (color) => 'data:image/svg+xml,' + encodeURIComponent(
 );
 
 /** Bangun array style cytoscape untuk sebuah tema. */
-export function buildGraphStyle(theme) {
+export function buildGraphStyle(theme, reducedMotion = false) {
   const p = graphPalette(theme);
   return [
     { selector: 'node', style: {
@@ -51,7 +51,7 @@ export function buildGraphStyle(theme) {
         'text-wrap': 'wrap', 'text-max-width': 110,
         // Transisi halus saat kelas seleksi/alur berubah (bukan fade mendadak).
         'transition-property': 'border-color, border-width, background-color, opacity, font-size, width, height',
-        'transition-duration': '200ms', 'transition-timing-function': 'ease-in-out' } },
+        'transition-duration': reducedMotion ? '0ms' : '200ms', 'transition-timing-function': 'ease-in-out' } },
     // ===== Compound / boundary boxes (C4 style) =====
     { selector: 'node:parent', style: {
         'background-color': p.parentBg, 'background-opacity': p.parentOpacity,
@@ -75,7 +75,7 @@ export function buildGraphStyle(theme) {
         'border-width': 4, 'border-color': p.selectedBorder,
         'background-blacken': p.blacken, 'font-size': 12, color: p.selectedText } },
     // Hasil pencarian: border amber agar mudah terlihat tanpa menimpa warna domain.
-    { selector: 'node.match', style: { 'border-width': 4, 'border-color': p.matchBorder } },
+    { selector: 'node.match', style: { 'border-color': p.matchBorder } },
     // Badge catatan: dot lingkaran (ala notifikasi) di sudut kanan-atas node —
     // penanda bahwa node punya notes (jembatan Manusia↔AI) tanpa menutupi warna
     // domain. background-image ditumpuk di atas background-color, bukan pie wedge.
@@ -122,7 +122,7 @@ export function buildGraphStyle(theme) {
         label: 'data(field)', 'font-size': 8, color: p.edgeText, 'text-rotation': 'autorotate',
         'text-background-color': p.edgeTextBg, 'text-background-opacity': 0.8, 'text-background-padding': 2,
         'transition-property': 'line-color, target-arrow-color, width, opacity',
-        'transition-duration': '200ms', 'transition-timing-function': 'ease-in-out' } },
+        'transition-duration': reducedMotion ? '0ms' : '200ms', 'transition-timing-function': 'ease-in-out' } },
     { selector: 'node.faded', style: { opacity: 0.15 } },
     { selector: 'edge.faded', style: { opacity: 0.06 } },
     { selector: 'edge.highlight', style: { 'line-color': p.highlight, 'target-arrow-color': p.highlight, width: 2.5 } },

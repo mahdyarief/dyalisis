@@ -475,5 +475,24 @@ function buildStyled(theme) {
     llms.includes('https://x.test/app/mcp'));
 }
 
+{
+  const { collapseGraph, syncElements, revealNode } = await import('../src/lib/navigation.js');
+  const ns = [{id:'root'}, {id:'one',parent:'root'}, {id:'two',parent:'root'}, {id:'a',parent:'one'}, {id:'b',parent:'two'}, {id:'c',parent:'one'}];
+  const es = [['a','b','x'],['c','b','y'],['a','c','internal']];
+  const collapsed = collapseGraph(ns, es, ['one']);
+  check('navigation: collapse removes descendants', !collapsed.nodes.some(n => ['a','c'].includes(n.id)));
+  check('navigation: collapse aggregates cross-module fields', collapsed.edges.length === 1 && collapsed.edges[0].join('|') === 'one|b|x, y');
+  check('navigation: expand restores original connectivity', collapseGraph(ns, es).edges.length === 3);
+  const cyNav = cytoscape({ headless:true, elements:ns.map(data => ({data})), layout:{name:'preset'} });
+  cyNav.getElementById('a').position({x:123,y:234});
+  cyNav.zoom(0.7); cyNav.pan({x:15,y:25});
+  const cache = new Map();
+  syncElements(cyNav, {nodes:collapsed.nodes.map(data => ({data})),edges:[]}, cache);
+  syncElements(cyNav, {nodes:ns.map(data => ({data})),edges:[]}, cache);
+  check('navigation: restored leaf position survives collapse', cyNav.getElementById('a').position().x === 123 && cyNav.getElementById('a').position().y === 234);
+  check('navigation: membership changes preserve camera', cyNav.zoom() === 0.7 && cyNav.pan().x === 15 && cyNav.pan().y === 25);
+  check('navigation: missing reveal is harmless', revealNode(cyNav,'missing') === false);
+  cyNav.destroy();
+}
 console.log(failures === 0 ? '\nAll tests passed.' : `\n${failures} test(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);

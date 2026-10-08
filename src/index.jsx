@@ -7,6 +7,8 @@ import { buildActivePath } from './lib/flow.js';
 import { analyze, noteInfo } from './lib/analysis.js';
 import { cn } from './lib/utils.js';
 import GraphCanvas from './components/GraphCanvas.jsx';
+import Minimap from './components/Minimap.jsx';
+import { collapseGraph, revealNode } from './lib/navigation.js';
 import Legend from './components/Legend.jsx';
 import UmlDiagram from './components/UmlDiagram.jsx';
 import ErdDiagram from './components/ErdDiagram.jsx';
@@ -27,7 +29,7 @@ const APP = C.APP || { name: 'Dyalisis', subtitle: 'Feature Analysis Graph' };
 
 // Breakpoint: sidebar "docked" (inline) mulai tablet (≥640); di bawahnya jadi
 // drawer overlay. Label toolbar yang lebih padat tetap pakai utilitas `md:`/`lg:`.
-const DOCK_MQ = '(min-width: 640px)';
+const DOCK_MQ = '(min-width: 1024px)';
 const isDockedViewport = () =>
   typeof window !== 'undefined' && window.matchMedia(DOCK_MQ).matches;
 
@@ -40,6 +42,9 @@ export default function DyalisisApp() {
   const [selectedId, setSelectedId] = React.useState(null);
   const [query, setQuery] = React.useState('');
   const [cyRef, setCyRef] = React.useState(null);
+  const [collapsedModules, setCollapsedModules] = React.useState([]);
+  const [sheetExpanded, setSheetExpanded] = React.useState(false);
+  const [pendingReveal, setPendingReveal] = React.useState(null);
   const [showActions, setShowActions] = React.useState(false);
   const [theme, setTheme] = React.useState('dark');
   const [sidebarOpen, setSidebarOpen] = React.useState(isDockedViewport);
@@ -52,8 +57,8 @@ export default function DyalisisApp() {
   const [filterMenuOpen, setFilterMenuOpen] = React.useState(false);
   // Filter facet — potong graf per domain, per level, atau hanya node ber-Catatan.
   // Melengkapi pencarian teks: facet berlaku lebih dulu, lalu query mempersempit.
-  const [facetDomain, setFacetDomain] = React.useState(null);
-  const [facetLevel, setFacetLevel] = React.useState(null);
+  const [facetDomain, setFacetDomain] = React.useState([]);
+  const [facetLevel, setFacetLevel] = React.useState([]);
   const [facetNoted, setFacetNoted] = React.useState(false);
   const searchRef = React.useRef(null);
   const layoutMenuRef = React.useRef(null);
@@ -95,25 +100,25 @@ export default function DyalisisApp() {
 
   // Filter facet: node yang lolos domain/level/catatan + seluruh ancestor-nya
   // (agar compound tidak orphan — pola sama seperti pencarian di bawah).
-  const hasFacets = facetDomain != null || facetLevel != null || facetNoted;
+  const hasFacets = facetDomain.length > 0 || facetLevel.length > 0 || facetNoted;
   // Turunan facet untuk UI: hitungan aktif, reset, dan daftar chip yang bisa dihapus.
-  const facetCount = (facetDomain != null ? 1 : 0) + (facetLevel != null ? 1 : 0) + (facetNoted ? 1 : 0);
+  const facetCount = facetDomain.length + facetLevel.length + (facetNoted ? 1 : 0);
   const resetFacets = React.useCallback(() => {
-    setFacetDomain(null); setFacetLevel(null); setFacetNoted(false);
+    setFacetDomain([]); setFacetLevel([]); setFacetNoted(false);
   }, []);
   const activeFacets = React.useMemo(() => {
     const out = [];
-    if (facetDomain != null && domains[facetDomain]) {
+    facetDomain.forEach(domain => {
       out.push({
-        key: `dom-${facetDomain}`,
-        label: domains[facetDomain].label,
-        dot: domains[facetDomain].color,
-        clear: () => setFacetDomain(null)
+        key: `dom-${domain}`,
+        label: domains[domain].label,
+        dot: domains[domain].color,
+        clear: () => setFacetDomain(values => values.filter(value => value !== domain))
       });
-    }
-    if (facetLevel != null) {
-      out.push({ key: `lvl-${facetLevel}`, label: levelLabel(facetLevel), clear: () => setFacetLevel(null) });
-    }
+    });
+    facetLevel.forEach(level => {
+      out.push({ key: `lvl-${level}`, label: levelLabel(level), clear: () => setFacetLevel(values => values.filter(value => value !== level)) });
+    });
     if (facetNoted) {
       out.push({ key: 'noted', label: 'Ber-Catatan', clear: () => setFacetNoted(false) });
     }
@@ -126,8 +131,8 @@ export default function DyalisisApp() {
     const keep = new Set();
     nodes.forEach((n) => {
       const ok =
-        (facetDomain == null || effDomain(n) === facetDomain) &&
-        (facetLevel == null || n.level === facetLevel) &&
+        (facetDomain.length === 0 || facetDomain.includes(effDomain(n))) &&
+        (facetLevel.length === 0 || facetLevel.includes(n.level)) &&
         (!facetNoted || !!notes[n.id]);
       if (ok) {
         keep.add(n.id);
@@ -148,26 +153,12 @@ export default function DyalisisApp() {
   }, [query, facetedNodes]);
 
   // Search: node yang match + seluruh ancestor-nya (agar compound tidak orphan).
-  const filteredNodes = React.useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return facetedNodes;
-    const byId = Object.fromEntries(facetedNodes.map((n) => [n.id, n]));
-    const keep = new Set();
-    facetedNodes.forEach((n) => {
-      if ((n.label || '').toLowerCase().includes(q) || (n.fields || '').toLowerCase().includes(q)) {
-        keep.add(n.id);
-        let p = n.parent;
-        while (p) { keep.add(p); p = byId[p] && byId[p].parent; }
-      }
-    });
-    return facetedNodes.filter((n) => keep.has(n.id));
-  }, [query, facetedNodes]);
+  // Search changes highlights/results only, never graph membership or camera.
+  const collapsedGraph = React.useMemo(() => collapseGraph(facetedNodes, C.DATA_EDGES || [], collapsedModules), [facetedNodes, collapsedModules]);
+  const filteredNodes = collapsedGraph.nodes;
 
   const visibleIds = React.useMemo(() => new Set(filteredNodes.map((n) => n.id)), [filteredNodes]);
-  const edges = React.useMemo(
-    () => (C.DATA_EDGES || []).filter(([s, t]) => visibleIds.has(s) && visibleIds.has(t)),
-    [visibleIds]
-  );
+  const edges = collapsedGraph.edges;
 
   const selected = nodes.find((n) => n.id === selectedId) || null;
   const d = selected && domains[selected.domain];
@@ -303,7 +294,15 @@ export default function DyalisisApp() {
     if (hasFacets && !visibleIds.has(id)) {
       resetFacets();
     }
+    setCollapsedModules(closed => closed.filter(moduleId => {
+      let current = node;
+      while (current) { if (current.parent === moduleId) return false; current = byIdAll[current.parent]; }
+      return true;
+    }));
     setSelectedId(id);
+    setPendingReveal(id);
+    setSidebarOpen(true);
+    setSheetExpanded(false);
   }, [byIdAll, showActions, query, visibleIds, hasFacets, resetFacets]);
 
   // Tap pada kanvas: klik latar (id null) membersihkan seleksi sekaligus
@@ -313,26 +312,32 @@ export default function DyalisisApp() {
   const handleCanvasSelect = React.useCallback((id) => {
     if (id == null) {
       setSelectedId(null);
+      setPendingReveal(null);
+      cyRef?.stop(true, false);
       setFlowMode(false);
     } else {
       setSelectedId(id);
+      setPendingReveal(id);
+      setSidebarOpen(true);
     }
-  }, []);
+    setSheetExpanded(false);
+  }, [cyRef]);
 
   // Center ke node terpilih (dipakai anak/relasi/breadcrumb & tombol Zoom).
   const zoomToNode = React.useCallback((id) => {
     const cy = cyRef;
     if (!cy) return;
-    const n = cy.getElementById(id);
-    if (n.empty()) return;
-    cy.animate({ center: { eles: n }, zoom: Math.max(cy.zoom(), 1.3), duration: 350, easing: 'ease-in-out' });
+    revealNode(cy, id, { focus: true, reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches });
   }, [cyRef]);
 
   React.useEffect(() => {
-    if (!selectedId) return;
-    const t = setTimeout(() => zoomToNode(selectedId), 30);
-    return () => clearTimeout(t);
-  }, [selectedId, zoomToNode]);
+    if (!pendingReveal || !cyRef) return;
+    const frame = requestAnimationFrame(() => {
+      revealNode(cyRef, pendingReveal, { focus: true, reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches });
+      setPendingReveal(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pendingReveal, cyRef, filteredNodes]);
 
   // Panel samping: inline di desktop, drawer overlay di mobile. Ikuti breakpoint
   // saat ukuran layar berubah (buka di desktop, tutup di mobile) supaya state
@@ -389,7 +394,7 @@ export default function DyalisisApp() {
     const level = Math.min(cy.maxZoom(), Math.max(cy.minZoom(), cy.zoom() * f));
     cy.zoom({ level, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
   };
-  const handleFit = () => { if (cyRef) cyRef.fit(40); };
+  const handleFit = () => { if (cyRef) { cyRef.stop(true, false); cyRef.fit(40); } };
   const exportPng = () => {
     const cy = cyRef;
     if (!cy) return;
@@ -454,12 +459,19 @@ export default function DyalisisApp() {
           <div className="flex shrink-0 items-center gap-0.5 rounded-md border p-0.5">
             <Button size="icon" variant="ghost" className="h-8 w-8" title="Zoom in" onClick={() => zoomBy(1.3)}><IconPlus /></Button>
             <Button size="icon" variant="ghost" className="h-8 w-8" title="Zoom out" onClick={() => zoomBy(1 / 1.3)}><IconMinus /></Button>
-            <Button size="icon" variant="ghost" className="h-8 w-8" title="Fit ke layar" onClick={handleFit}><IconFit /></Button>
+            <Button size="icon" variant="ghost" className="h-8 w-8" title="Fit all" onClick={handleFit}><IconFit /></Button>
           </div>
           <Button size="sm" variant="outline" className="shrink-0 gap-1" onClick={exportPng}><IconDownload /><span className="hidden sm:inline">PNG</span></Button>
         </div>
       </div>
 
+      {query.trim() && <div className="max-h-40 overflow-auto border-b px-3 py-2" aria-label="Module and feature explorer">
+        {facetedNodes.filter(n => ['module', 'feature'].includes(n.type) && (!query.trim() || matchIds.includes(n.id))).map(n => <div key={n.id} className="flex items-center gap-2 text-sm">
+          <button className="rounded px-2 py-1 hover:bg-secondary" onClick={() => selectNode(n.id)}>{n.type === 'feature' ? '↳ ' : ''}{n.label}</button>
+          {n.type === 'module' && <button aria-expanded={!collapsedModules.includes(n.id)} onClick={() => setCollapsedModules(ids => ids.includes(n.id) ? ids.filter(id => id !== n.id) : [...ids, n.id])}>{collapsedModules.includes(n.id) ? 'Expand' : 'Collapse'}</button>}
+        </div>)}
+        {emptySearch && <p className="text-sm">Tidak ada hasil cocok.</p>}
+      </div>}
       {/* Filter facet — potong graf per domain / level / Catatan.
           Pola popover: satu tombol "Filter" + chip filter aktif; opsi lengkap
           di panel ter-anchor. Tanpa scroll horizontal di lebar mana pun. */}
@@ -489,8 +501,9 @@ export default function DyalisisApp() {
                   {Object.entries(domains).map(([key, dv]) => (
                     <button key={key}
                       className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition-colors',
-                        facetDomain === key ? 'bg-accent font-medium' : 'hover:bg-accent/50')}
-                      onClick={() => setFacetDomain(facetDomain === key ? null : key)}>
+                        facetDomain.includes(key) ? 'bg-accent font-medium' : 'hover:bg-accent/50')}
+                      aria-pressed={facetDomain.includes(key)}
+                      onClick={() => setFacetDomain(values => values.includes(key) ? values.filter(value => value !== key) : [...values, key])}>
                       <span className="h-1.5 w-1.5 rounded-full" style={{ background: dv.color }} />
                       {dv.label}
                     </button>
@@ -504,8 +517,12 @@ export default function DyalisisApp() {
                   {LEVEL_CHOICES.map(([lv, label]) => (
                     <button key={lv}
                       className={cn('rounded-full border px-2 py-0.5 text-[11px] transition-colors',
-                        facetLevel === lv ? 'bg-accent font-medium' : 'hover:bg-accent/50')}
-                      onClick={() => { const next = facetLevel === lv ? null : lv; setFacetLevel(next); if (next === 3) setShowActions(true); }}>
+                        facetLevel.includes(lv) ? 'bg-accent font-medium' : 'hover:bg-accent/50')}
+                      aria-pressed={facetLevel.includes(lv)}
+                      onClick={() => {
+                        setFacetLevel(values => values.includes(lv) ? values.filter(value => value !== lv) : [...values, lv]);
+                        if (lv === 3 && !facetLevel.includes(lv)) setShowActions(true);
+                      }}>
                       {label}
                     </button>
                   ))}
@@ -558,6 +575,7 @@ export default function DyalisisApp() {
             selectedId={selectedId} matchIds={highlightIds} flowPath={graphFlowPath} flowBranchIds={flowBranchIds}
             notedIds={notedIds}
             theme={theme} onSelect={handleCanvasSelect} onReady={setCyRef} />
+          <Minimap cy={cyRef} />
           <Legend domains={domains} showActions={showActions} flowActive={flowMode && graphFlowPath.length > 1}
             notedCount={notedIds.length} highlight={graphPalette(theme).highlight}
             noteColor={graphPalette(theme).noteColor} />
@@ -597,23 +615,24 @@ export default function DyalisisApp() {
           </div>
         </main>
 
-        {sidebarOpen && (
-          <div className="fixed inset-0 z-20 bg-black/40 backdrop-blur-sm sm:hidden"
-            onClick={() => setSidebarOpen(false)} aria-hidden="true" />
+        {sidebarOpen && sheetExpanded && (
+          <div className="fixed inset-0 z-20 bg-black/40 lg:hidden"
+            onClick={() => setSheetExpanded(false)} aria-hidden="true" />
         )}
 
         <aside className={cn(
           'no-scrollbar overflow-y-auto bg-card/30',
           // Mobile: drawer overlay dari kanan (lebar tetap, geser masuk/keluar).
-          'fixed inset-y-0 right-0 z-30 w-80 max-w-[85vw] border-l p-3 shadow-xl transition-transform duration-200',
-          sidebarOpen ? 'translate-x-0' : 'translate-x-full',
-          // Tablet & desktop: kembali ke layout inline (sidebar docked).
-          'sm:static sm:z-auto sm:max-w-none sm:translate-x-0 sm:shadow-none sm:transition-none',
-          sidebarOpen ? 'sm:w-64 sm:p-3 lg:w-80' : 'sm:w-0 sm:overflow-hidden sm:border-l-0 sm:p-0'
+          'fixed bottom-0 inset-x-0 z-30 border-t rounded-t-xl bg-background p-3 shadow-xl',
+          sheetExpanded ? 'h-[75dvh]' : 'h-[180px]',
+          sidebarOpen ? 'block' : 'hidden',
+          'lg:static lg:block lg:h-auto lg:rounded-none lg:border-t-0 lg:border-l lg:shadow-none',
+          sidebarOpen ? 'lg:w-80' : 'lg:w-0 lg:overflow-hidden lg:border-l-0 lg:p-0'
         )}>
           {/* Mobile-only: tombol tutup (drawer menutupi sebagian besar layar,
               jadi strip backdrop terlalu tipis untuk diandalkan). */}
-          <div className="mb-2 flex justify-end sm:hidden">
+          <div className="mb-2 flex justify-between lg:hidden">
+            <Button size="sm" variant="ghost" aria-expanded={sheetExpanded} onClick={() => setSheetExpanded(v => !v)}>{sheetExpanded ? 'Ringkas' : 'Perluas detail'}</Button>
             <Button size="icon" variant="ghost" title="Tutup panel"
               className="h-8 w-8" onClick={() => setSidebarOpen(false)}>
               <IconClose />
@@ -629,7 +648,7 @@ export default function DyalisisApp() {
                   : <>Tidak ada node yang cocok dengan filter aktif.</>}
               </p>
               <Button size="sm" variant="outline"
-                onClick={() => { setQuery(''); setFacetDomain(null); setFacetLevel(null); setFacetNoted(false); }}>
+                onClick={() => { setQuery(''); resetFacets(); }}>
                 Bersihkan
               </Button>
             </div>

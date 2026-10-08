@@ -4,6 +4,7 @@ import dagre from 'cytoscape-dagre';
 import elk from 'cytoscape-elk';
 import { applyLayout, LAYOUT_DEFS, DEFAULT_LAYOUT } from '../lib/layouts.js';
 import { buildGraphStyle } from '../lib/graph-style.js';
+import { syncElements } from '../lib/navigation.js';
 
 // Registrasi extension — pola register-vs-use: dagre/elk mengekspor fungsi
 // register(cytoscape), bukan objek. Dipanggil sekali saat module load.
@@ -23,7 +24,7 @@ export function toElements(nodes, edges, domains = {}) {
     nodes: nodes.map((n) => ({
       data: { id: n.id, label: n.label, domain: n.domain, level: n.level,
         color: (domains[n.domain] || {}).color || '#94a3b8', ...n },
-      grabbable: true
+      grabbable: false, pannable: true
     })),
     edges: edges.map(([s, t, f], i) => ({
       data: { id: `e${i}`, source: s, target: t, field: f }
@@ -50,7 +51,17 @@ function markAnchor(cy, selectedId) {
 }
 
 /** Cytoscape graph canvas. Controlled-ish: exposes the cy instance via onReady. */
-export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelect, selectedId, onReady, matchIds, flowPath = null, flowBranchIds = null, notedIds = null, theme = 'dark' }) {
+export default function GraphCanvas({ nodes, edges, domains, layoutName, layoutRevision = 0, arrange = false, neighborhood = false, onSelect, selectedId, onReady, matchIds, flowPath = null, flowBranchIds = null, notedIds = null, theme = 'dark' }) {
+  const positionsRef = React.useRef(new Map());
+  const selectRef = React.useRef(onSelect);
+  selectRef.current = onSelect;
+  const [reducedMotion, setReducedMotion] = React.useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  React.useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const change = () => { setReducedMotion(mq.matches); cyRef.current?.stop(true, false); layoutRef.current?.stop(); };
+    mq.addEventListener('change', change);
+    return () => mq.removeEventListener('change', change);
+  }, []);
   const containerRef = React.useRef(null);
   const cyRef = React.useRef(null);
   const layoutRef = React.useRef(null);       // layout yang sedang berjalan (untuk .stop())
@@ -64,18 +75,27 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
     const cy = cytoscape({
       container: containerRef.current,
       elements: toElements(nodes, edges, domains),
-      style: buildGraphStyle(theme),
+      style: buildGraphStyle(theme, reducedMotion),
       minZoom: 0.2,
       maxZoom: 6,
-      wheelSensitivity: 1.2,
+      wheelSensitivity: 0.2,
+      autoungrabify: true,
       // Sentuh: matikan box-select supaya tap-drag = pan (bukan seleksi area),
       // dan longgarkan ambang tap agar jari tidak salah memilih node.
       boxSelectionEnabled: false,
       touchTapThreshold: 8,
       desktopTapThreshold: 4
     });
-    cy.on('tap', 'node', (evt) => { if (onSelect) onSelect(evt.target.id()); });
-    cy.on('tap', (evt) => { if (evt.target === cy && onSelect) onSelect(null); });
+    cy.on('tap', 'node', (evt) => selectRef.current?.(evt.target.id()));
+    cy.on('tap', (evt) => { if (evt.target === cy) selectRef.current?.(null); });
+    const interrupt = () => { cy.stop(true, false); layoutRef.current?.stop(); };
+    const el = containerRef.current;
+    el.addEventListener('pointerdown', interrupt, true);
+    el.addEventListener('wheel', interrupt, { capture: true, passive: true });
+    cy.on('destroy', () => {
+      el.removeEventListener('pointerdown', interrupt, true);
+      el.removeEventListener('wheel', interrupt, true);
+    });
     cyRef.current = cy;
     // Instan (tanpa animasi) saat mount supaya tak ada transisi aneh saat refresh.
     layoutRef.current = applyLayout(cy, DEFAULT_LAYOUT, { animate: false });
@@ -89,7 +109,13 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
   React.useEffect(() => {
     const el = containerRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => { if (cyRef.current) cyRef.current.resize(); });
+    const ro = new ResizeObserver(() => {
+      const cy = cyRef.current;
+      if (!cy) return;
+      const viewport = { zoom: cy.zoom(), pan: { ...cy.pan() } };
+      cy.resize();
+      cy.viewport(viewport);
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -98,8 +124,17 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
   React.useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
-    cy.style().fromJson(buildGraphStyle(theme)).update();
-  }, [theme]);
+    cy.style().fromJson(buildGraphStyle(theme, reducedMotion)).update();
+  }, [theme, reducedMotion]);
+
+  React.useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.autoungrabify(!arrange);
+    cy.nodes().grabify();
+    if (arrange) cy.nodes().unpanify(); else cy.nodes().panify();
+    containerRef.current.style.cursor = arrange ? 'default' : 'grab';
+  }, [arrange, nodes]);
 
   // Layout saat layoutName berubah — lewati run pertama (sudah di-init).
   React.useEffect(() => {
@@ -107,20 +142,19 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
     if (!cy) return;
     if (firstRunRef.current) { firstRunRef.current = false; return; }
     if (layoutRef.current && layoutRef.current.stop) layoutRef.current.stop();
-    layoutRef.current = applyLayout(cy, layoutName, { animate: true });
-  }, [layoutName]);
+    layoutRef.current = applyLayout(cy, layoutName, { animate: !window.matchMedia('(prefers-reduced-motion: reduce)').matches });
+  }, [layoutName, layoutRevision]);
 
   // Data berubah (search/toggle aksi): ganti elemen, lalu layout instan agar rapi.
   React.useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
     if (dataRunRef.current) { dataRunRef.current = false; return; }
-    cy.batch(() => {
-      cy.elements().remove();
-      cy.add(toElements(nodes, edges, domainsRef.current));
-    });
-    if (layoutRef.current && layoutRef.current.stop) layoutRef.current.stop();
-    layoutRef.current = applyLayout(cy, layoutName, { animate: true });
+    cy.stop(true, false);
+    layoutRef.current?.stop();
+    syncElements(cy, toElements(nodes, edges, domainsRef.current), positionsRef.current);
+    cy.nodes().grabify();
+    if (arrange) cy.nodes().unpanify(); else cy.nodes().panify();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, edges]);
 
@@ -129,7 +163,7 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
   React.useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
-    cy.elements().removeClass('faded highlight match anchor flow chain flow-start flow-end flow-branch');
+    cy.elements().removeClass('faded highlight match anchor flow chain flow-start flow-end flow-branch noted');
 
     // Badge catatan (jembatan Manusia↔AI) — independen dari mode seleksi.
     if (notedIds && notedIds.length) {
@@ -189,6 +223,7 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
     if (!selectedId) return;
     const node = cy.getElementById(selectedId);
     if (node.empty()) return;
+    if (!neighborhood) { markAnchor(cy, selectedId); return; }
     const neighborNodes = node.neighborhood().nodes();
     let keep = node.union(node.ancestors()).union(node.descendants()).union(node.neighborhood());
     neighborNodes.forEach((n) => { keep = keep.union(n.ancestors()); });
@@ -196,7 +231,7 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
     cy.elements().not(keep).not(keepEdges).addClass('faded');
     keepEdges.addClass('highlight');
     markAnchor(cy, selectedId);
-  }, [selectedId, matchIds, flowPath, notedIds]);
+  }, [selectedId, matchIds, flowPath, flowBranchIds, notedIds, nodes, edges, neighborhood]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 }

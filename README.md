@@ -51,10 +51,18 @@ menyusun perspektif **C4 Model**, **arc42** (12 seksi lengkap), daftar **ADR**
 data; content boleh menimpanya lewat `ARC42`/`DOCS`.
 
 Tata letak **responsif tiga tingkat** (mobile `<640px`, tablet `640–1023px`,
-desktop `≥1024px`): sidebar menyatu (docked) mulai breakpoint tablet, dan di
-bawahnya jadi panel geser. Transisi panel/drawer, morf layout graf, dan
-micro-interaction tombol dianimasikan halus, dan semuanya otomatis dinonaktifkan
-saat OS meminta `prefers-reduced-motion`.
+desktop `≥1024px`): detail docked hanya di desktop; mobile/tablet memakai
+bottom sheet ringkas yang tidak memblokir kanvas, dengan opsi perluas detail.
+Geser kanvas dari latar maupun node/compound tanpa memindahkan posisi node.
+Klik node atau pilih hasil pencarian, relasi, maupun langkah Alur untuk
+**auto-zoom** ke pilihan tersebut. Drag atau scroll menghentikan animasi kamera.
+Mengetik pencarian hanya menyorot hasil dan menampilkan daftar modul/fitur,
+tanpa mengubah posisi atau zoom. Filter, Aksi, dan collapse/expand mempertahankan
+kamera serta posisi tersimpan; collapse mengagregasi koneksi lintas modul.
+Kontrol navigasi tetap ringkas: zoom **+/−**, **Fit all**, dan minimap SVG
+(klik atau tombol panah untuk navigasi); pilihan layout dan Aksi ada di kanvas.
+Animasi kamera/layout dan transisi graf mengikuti `prefers-reduced-motion`,
+termasuk perubahan preferensi saat runtime.
 
 ## Quickstart
 
