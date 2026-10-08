@@ -1,8 +1,10 @@
 // Dyalisis build — compile engine (paket) + content (proyek) menjadi SATU file
 // HTML mandiri (CSS + JS inline). Engine diambil dari direktori paket ini;
 // content dari proyek pemakai (default ./dyalisis.content.js, atau --content).
-//   node build.mjs [--content <file>] [--out <file>]
-// Dipakai juga sebagai library oleh bin/dyalisis.mjs.
+//   node build.mjs [--content <file>] [--spec <dir>] [--out <file>]
+// `--spec <dir>` men-generate content dari spec Markdown 4-aksis (lihat
+// lib/spec.mjs) alih-alih file content. Dipakai juga sebagai library oleh
+// bin/dyalisis.mjs.
 import { build } from 'esbuild';
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
@@ -24,12 +26,47 @@ export function resolveContentFile(projectDir, explicit) {
   return existsSync(local) ? local : resolve(ENGINE_DIR, 'src/data/example.js');
 }
 
+// Serialisasi objek content → modul ES statis (tanpa import Node apa pun),
+// supaya parser spec TIDAK ikut ter-bundle ke dalam HTML single-file.
+function serializeContent(C) {
+  const json = (v) => JSON.stringify(v, null, 2);
+  return [
+    '// GENERATED dari spec Markdown — jangan disunting manual.',
+    `export const APP = ${json(C.APP)};`,
+    `export const DOMAINS = ${json(C.DOMAINS)};`,
+    `export const ROOT = ${json(C.ROOT)};`,
+    `export const MODULES = ${json(C.MODULES)};`,
+    `export const NODES = ${json(C.NODES)};`,
+    `export const ACTIONS = ${json(C.ACTIONS)};`,
+    `export const EDGES = ${json(C.EDGES)};`,
+    `export const DATA_EDGES = ${json(C.DATA_EDGES)};`,
+    `export const LEVELS = ${json(C.LEVELS)};`,
+    `export const LEVEL_NAMES = ${json(C.LEVEL_NAMES)};`,
+    'export const levelOf = (id) => { for (const k in LEVELS) if (LEVELS[k].includes(id)) return +k; return 0; };',
+    ''
+  ].join('\n');
+}
+
 /** Build engine + content → satu file HTML mandiri. */
-export async function buildDyalisis({ engineDir = ENGINE_DIR, projectDir = process.cwd(), content, out } = {}) {
-  const CONTENT = resolveContentFile(projectDir, content);
+export async function buildDyalisis({ engineDir = ENGINE_DIR, projectDir = process.cwd(), content, spec, appName, out } = {}) {
   const OUT = out ? resolve(projectDir, out) : resolve(projectDir, 'dist/index.html');
   const tmp = resolve(projectDir, '.dyalisis-tmp');
   mkdirSync(tmp, { recursive: true });
+
+  // Bila --spec diberikan: parse spec → tulis content statis sementara, lalu
+  // pakai file itu sebagai content. Parser hanya jalan di Node (build time).
+  let CONTENT;
+  let generatedSpec = null;
+  if (spec) {
+    const { parseSpecDir } = await import('./lib/spec.mjs');
+    const C = parseSpecDir(resolve(projectDir, spec), { appName });
+    if (!C.MODULES.length) throw new Error(`[dyalisis] --spec: tak ada modul ter-parse di ${spec}`);
+    generatedSpec = resolve(projectDir, '.dyalisis-spec.content.mjs');
+    writeFileSync(generatedSpec, serializeContent(C));
+    CONTENT = generatedSpec;
+  } else {
+    CONTENT = resolveContentFile(projectDir, content);
+  }
 
   console.log(`[dyalisis] content : ${CONTENT}`);
   console.log(`[dyalisis] output  : ${OUT}`);
@@ -86,11 +123,19 @@ export async function buildDyalisis({ engineDir = ENGINE_DIR, projectDir = proce
   const GRAPH_OUT = resolve(dirname(OUT), 'graph.json');
   writeFileSync(GRAPH_OUT, JSON.stringify(toGraphJson(C), null, 2) + '\n');
   console.log(`[dyalisis] graph   : ${GRAPH_OUT}`);
+
+  // Bersihkan content temporer hasil --spec (dipakai sampai graph.json di atas).
+  if (generatedSpec) rmSync(generatedSpec, { force: true });
 }
 
-// CLI: `node build.mjs [--content f] [--out f]` (dipakai di repo engine).
+// CLI: `node build.mjs [--content f] [--spec dir] [--out f]` (dipakai di repo engine).
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const flagValue = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
-  await buildDyalisis({ content: flagValue('--content'), out: flagValue('--out') });
+  await buildDyalisis({
+    content: flagValue('--content'),
+    spec: flagValue('--spec'),
+    appName: flagValue('--app-name'),
+    out: flagValue('--out')
+  });
 }

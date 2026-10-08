@@ -117,6 +117,18 @@ export function analyze(C, opts = {}) {
 }
 
 /** Ekspor serializable: node, edge, analisis. Ditulis sebagai dist/graph.json. */
+// Field content opsional hasil spec 4-aksis (Brief/Goals/Workflow/Entity) +
+// ERD modul. Disertakan hanya bila ada supaya graph.json tetap ringkas dan
+// backward-compatible untuk content yang tidak memakai spec.
+const SPEC_FIELDS = ['brief', 'goals', 'workflow', 'entities', 'sources',
+  'evidence', 'status', 'erd', 'spec'];
+
+export function specFields(n) {
+  const out = {};
+  for (const k of SPEC_FIELDS) if (n[k] != null) out[k] = n[k];
+  return out;
+}
+
 export function toGraphJson(C, opts = {}) {
   const model = buildModel(C);
   const notes = C.NOTES || {};
@@ -126,6 +138,7 @@ export function toGraphJson(C, opts = {}) {
       id: n.id, label: n.label, domain: n.domain, type: n.type, level: n.level,
       parent: n.parent || null, route: n.route || null, fields: n.fields || null,
       perm: n.perm || null,
+      ...specFields(n),
       note: text != null ? { text, provenance } : null
     };
   });

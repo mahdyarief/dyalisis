@@ -25,7 +25,7 @@ ada di [`CONTRIBUTING.md`](../../../CONTRIBUTING.md).
 
 ```bash
 npm install
-npm test          # 46 self-check headless (semua PASS)
+npm test          # 65 self-check headless (semua PASS)
 npm run build     # → dist/index.html + dist/graph.json (demo dari src/data/example.js)
 ```
 
@@ -41,6 +41,8 @@ npm run build     # → dist/index.html + dist/graph.json (demo dari src/data/ex
 | Server MCP | `lib/mcp.mjs` | `serve --mcp`, JSON-RPC stdio tanpa dependency |
 | Seksi Dokumentasi | `src/components/DocsPanel.jsx` | C4 / arc42 / ADR / glosarium / Diátaxis |
 | Diagram per-node | `src/components/UmlDiagram.jsx` | SVG inline, theme-aware |
+| Ingest spec Markdown → content | `lib/spec.mjs` + `src/lib/erd.js` | parser Node-only (`build --spec`); `erd.js` isomorphic Node+browser |
+| Renderer ERD (erDiagram) | `src/components/ErdDiagram.jsx` | SVG inline dari `erDiagram`, tema-aware, tanpa dependency |
 | Legenda | `src/components/Legend.jsx` | ikut saat menambah kelas visual baru |
 | Wiring app / state | `src/index.jsx` | content → elemen cytoscape, toolbar, sidebar |
 | Check verifikasi | `test/run.mjs` | `check('nama', kondisi)` |

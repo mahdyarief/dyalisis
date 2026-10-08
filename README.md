@@ -33,6 +33,9 @@ menampilkan panel **Insight** — analisis turunan dari graf relasi data: **hub*
 Tiap node punya **UML class diagram** di sidebar (atribut dari field kunci,
 operasi dari aksi, asosiasi berlabel field penghubung) — digambar sebagai SVG
 inline, theme-aware, tanpa dependency tambahan. Klik diagram → **modal perbesar**.
+Bila content berasal dari ingest spec (lihat §Dari spec Markdown), sidebar juga
+menampilkan seksi **Spesifikasi** (Brief/Goals/Workflow/Entity + chip sumber &
+level bukti) dan **ERD modul** sebagai SVG (dari `erDiagram`, tanpa dependency).
 Mode **Alur** menyorot rantai fitur end-to-end dari relasi data (mis. Pendaftaran →
 Periksa → SOAP → Resep → Billing) di sidebar + highlight pada graph. Node jalur,
 panah berurutan, dan langkah yang sedang dipilih memakai **satu bahasa warna**
@@ -55,8 +58,15 @@ Pakai sebagai framework npm — buat proyek content baru, lalu isi data aplikasi
 npx dyalisis init aplikasi-saya   # scaffold folder proyek content
 cd aplikasi-saya
 npm install
-npx dyalisis test                 # 46 self-check headless → harus semua PASS
+npx dyalisis test                 # 65 self-check headless → harus semua PASS
 npx dyalisis build                # → dist/index.html + dist/graph.json
+```
+
+Punya spec Markdown (lihat §Dari spec Markdown)? Lewati scaffold dan build
+langsung dari spec — parser memetakannya ke kontrak content di build time.
+
+```bash
+npx dyalisis build --spec ./feature-analysis/spec   # tanpa menulis dyalisis.content.js
 ```
 
 Buka `dist/index.html` di browser. AI agent cukup menyunting `dyalisis.content.js`
@@ -66,8 +76,39 @@ Buka `dist/index.html` di browser. AI agent cukup menyunting `dyalisis.content.j
 
 1. `npx dyalisis init <nama-app>` → folder proyek + `dyalisis.content.js` (stub).
 2. Isi `dyalisis.content.js` sesuai kontrak (§ Content contract di bawah).
-3. `npx dyalisis test` → harus **46/46 PASS**.
+3. `npx dyalisis test` → harus **65/65 PASS**.
 4. `npx dyalisis build` → `dist/index.html` (+ `dist/graph.json`).
+
+## Dari spec Markdown 4-aksis (opsional)
+
+Kalau fitur sudah didokumentasikan sebagai spec Markdown, Dyalisis bisa
+memetakannya ke kontrak content langsung di build time — tanpa menulis
+`dyalisis.content.js` manual:
+
+```bash
+npx dyalisis build --spec ./feature-analysis/spec          # default: dist/index.html
+npx dyalisis build --spec ./feature-analysis/spec --app-name "SoftMedis"
+```
+
+Folder spec berisi satu file per modul (`spec-01-*.md` …) dengan format:
+
+- **H1** modul → judul + id `mod-<domain>` dalam backtick (mis.
+  `# Spec 01 — Modul Pendaftaran (\`mod-pendaftaran\`)`).
+- **Blokquote** intro modul (sebelum `##` pertama) → deskripsi modul.
+- **```mermaid** `erDiagram` (opsional) → ERD modul, digambar sebagai SVG di sidebar.
+- **Heading fitur** persis: ``### `<id>` — <Label> · cluster `mod-<domain>` ``.
+- **Bullet 4-aksis** per fitur: `- **Brief.**`, `- **Goals.**`,
+  `- **Workflow.**` (langkah dipisah `→` → tiap langkah jadi satu Aksi),
+  `- **Entity.**` (`\`pasien\` (no_rm, nik); …` — atribut dari ERD melengkapi tipe).
+
+`feature-registry.md` (satu level di atas folder spec) memasok **sumber** tiap
+fitur (`APP:path`, dipisah `;`), **level bukti** (PROVEN/OBSERVED/REFERENCED/
+PROPOSED), dan **status** — ditampilkan sebagai chip di sidebar. Judul
+`00-INDEX.md` (opsional) memasok nama aplikasi.
+
+Parser zero-dependency ini jalan **hanya di Node saat build**; hasilnya
+diserialisasi ke modul content statis, jadi engine single-file tetap tak
+berubah ukurannya (±10 KB) dan tak menambah runtime dependency.
 
 ## Publish ke domain (opsional)
 
@@ -126,6 +167,13 @@ Opsional (memperkaya panel Dokumentasi + catatan): `DECISIONS` (ADR), `ARC42`
 Aturan wajib: id unik, parent valid tanpa siklus, `MODULES[i].id` = `mod-<domain>`,
 tiap modul ≥1 fitur, tiap fitur ≥1 aksi, semua `domain` terdaftar di `DOMAINS`.
 
+Field opsional dari ingest spec (dipakai seksi **Spesifikasi** sidebar): modul
+boleh membawa `erd` (sumber `erDiagram`) + `spec` (prosa intro); fitur boleh
+membawa `brief`, `goals`, `workflow`, `entities`, `sources`, `evidence`, `status`.
+Semuanya diabaikan bila kosong, jadi content manual tetap valid. Field ini juga
+ikut terserialisasi ke `dist/graph.json` dan balasan MCP (`get_node`) — hanya
+disertakan bila ada, sehingga skema tetap ringkas dan backward-compatible.
+
 ## Analisis & graph.json (opsional)
 
 Selain `dist/index.html`, `build` juga menulis **`dist/graph.json`** — model
@@ -153,7 +201,7 @@ bin/dyalisis.mjs  CLI (init/build/test/publish/serve/login/list)
 build.mjs         bundler → HTML+graph.json  src/index.jsx     app React
 lib/scaffold.mjs  scaffolder proyek        src/components/     GraphCanvas + ui/*
 lib/patch-elk.mjs patch cytoscape-elk      src/lib/            layout + flow + analysis
-lib/publish.mjs   client publish           test/run.mjs        self-test (46)
+lib/publish.mjs   client publish           test/run.mjs        self-test (65)
 lib/slug.mjs      slug unik bersama        test/mcp.mjs        self-test MCP
 lib/mcp.mjs       server MCP stdio         test/publish.mjs    self-test publish
 server/           publish server (zero-dep, tanpa DB)

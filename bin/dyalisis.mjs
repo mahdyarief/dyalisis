@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Dyalisis CLI — `npx dyalisis <init|build|test|publish|serve|login|list>`.
 //   init [dir]     scaffold proyek content baru (default ./dyalisis-app)
-//   build  [--content f] [--out f]   build → single-file HTML
+//   build  [--content f] [--spec dir] [--out f]   build → single-file HTML
 //   test   [--content f]             validasi content (headless)
 //   login <handle> [--url u]         daftar handle → token (disimpan .dyalisisrc.json)
 //   publish [--slug nama] [--url u] [--token t] [--overwrite] [--no-build]
@@ -26,7 +26,9 @@ const HELP = `dyalisis — feature-analysis visualization framework
 
 Pemakaian:
   npx dyalisis init [dir]                      scaffold proyek content baru
-  npx dyalisis build [--content f] [--out f]   build → dist/index.html
+  npx dyalisis build [--content f] [--spec dir] [--out f]
+                                               build → dist/index.html
+                                               (--spec: content dari spec Markdown)
   npx dyalisis test  [--content f]             validasi content (headless)
   npx dyalisis login <handle> [--url u]        daftar identitas → simpan token
   npx dyalisis publish [--slug nama] [--url u] [--token t] [--overwrite] [--no-build]
@@ -53,7 +55,12 @@ async function main() {
 
   if (cmd === 'build') {
     const { buildDyalisis } = await import(lib('build.mjs'));
-    await buildDyalisis({ content: flagValue(rest, '--content'), out: flagValue(rest, '--out') });
+    await buildDyalisis({
+      content: flagValue(rest, '--content'),
+      spec: flagValue(rest, '--spec'),
+      appName: flagValue(rest, '--app-name'),
+      out: flagValue(rest, '--out')
+    });
     return;
   }
 

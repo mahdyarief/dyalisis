@@ -39,6 +39,7 @@ dyalisis/
 ├── build.mjs              # bundler engine+content → dist/index.html (juga library)
 ├── lib/
 │   ├── scaffold.mjs       # scaffolder proyek content (`dyalisis init`)
+│   ├── spec.mjs           # parser spec Markdown 4-aksis → content (`build --spec`)
 │   └── patch-elk.mjs      # patch bug upstream cytoscape-elk (lazy, lihat §7)
 ├── template.html          # shell HTML (placeholder CSS/JS/title)
 ├── tailwind.config.js
@@ -46,12 +47,13 @@ dyalisis/
 ├── src/
 │   ├── index.jsx          # React app: data → elemen cytoscape, toolbar, sidebar
 │   ├── styles.css         # Tailwind + CSS vars shadcn (tema dark)
-│   ├── components/        # GraphCanvas.jsx (cytoscape) + ui/* (shadcn-style)
+│   ├── components/        # GraphCanvas.jsx (cytoscape) + ErdDiagram.jsx + ui/*
 │   ├── lib/layouts.js     # preset layout + applyLayout()
 │   ├── lib/flow.js        # buildActivePath() untuk Mode Alur
+│   ├── lib/erd.js         # parser erDiagram (isomorphic: Node parser + browser)
 │   └── data/
 │       └── example.js     # CONTENT demo generik (di-ship bersama framework)
-└── test/run.mjs           # self-test headless (integritas, compound, layout, flow)
+└── test/run.mjs           # self-test headless (integritas, compound, layout, flow, spec)
 ```
 
 **Engine vs content terpisah total.** Engine (semua kecuali content) tidak tahu
@@ -67,13 +69,23 @@ Dipakai sebagai framework npm — scaffold proyek content baru:
 npx dyalisis init aplikasi-saya   # folder proyek + dyalisis.content.js (stub)
 cd aplikasi-saya
 npm install
-npx dyalisis test                 # 46 self-check headless → semua PASS
+npx dyalisis test                 # 65 self-check headless → semua PASS
 npx dyalisis build                # → dist/index.html + dist/graph.json
 ```
 
 Untuk aplikasi nyata, cukup sunting `dyalisis.content.js` lalu ulangi
 `test` → `build`. `--content <file>` dan `--out <file>` bisa dipakai untuk
 menunjuk file/lokasi lain (default: `./dyalisis.content.js` dan `dist/index.html`).
+
+**Dari spec Markdown (opsional).** Bila fitur sudah terdokumentasi sebagai spec
+4-aksis (Brief/Goals/Workflow/Entity + blok `erDiagram`), lewati scaffold dan
+bangun langsung dari folder spec — parser (`lib/spec.mjs`) memetakannya ke
+kontrak di build time:
+
+```bash
+npx dyalisis build --spec ./feature-analysis/spec            # → dist/index.html
+npx dyalisis build --spec ./feature-analysis/spec --app-name "SoftMedis"
+```
 
 ## 4. Kontrak content layer (WAJIB)
 
@@ -126,7 +138,26 @@ export const NOTES     = { idNode: 'catatan kritis...' };        // catatan per 
 // provenance 'spec' (berdasar dokumen) | 'inferred' (hasil simpulan).
 ```
 
-**Aturan struktur yang diuji `npm test` (46 check):**
+**Field opsional hasil ingest spec (seksi Spesifikasi sidebar):**
+
+```js
+// Modul boleh membawa: erd (sumber `erDiagram`) + spec (prosa intro modul).
+// Fitur boleh membawa:
+//   brief, goals, workflow  — ringkasan sumbu 4-aksis
+//   entities                — [{ name, attrs:[{ type, name, key, note }] }]
+//   sources                 — ['APP:path', ...] dari feature-registry.md
+//   evidence                — PROVEN | OBSERVED | REFERENCED | PROPOSED
+//   status                  — teks status bebas
+```
+
+Semua field ini opsional dan diabaikan bila kosong, jadi content manual apa pun
+tetap valid. Field yang ada ikut terserialisasi ke `dist/graph.json` dan balasan
+MCP (`get_node`) lewat helper `specFields()` di `src/lib/analysis.js`.
+ERD (`erDiagram`) digambar `ErdDiagram.jsx` sebagai SVG inline
+(theme-aware, tanpa dependency) — renderer memakai parser isomorphic
+`src/lib/erd.js` yang sama dengan `lib/spec.mjs`.
+
+**Aturan struktur yang diuji `npm test` (65 check):**
 - `id` unik di seluruh node.
 - `parent` tiap node merujuk id yang ada; **tanpa siklus**.
 - `MODULES[i].id` **harus** `mod-<domain>` — engine menurunkan parent fitur dari
@@ -220,7 +251,7 @@ dot pada daftar langkah Alur, dan badge teks `spec`/`inferred` di sidebar.
 2. Isi `APP`, `DOMAINS` (label + warna), `ROOT`, `MODULES`, `NODES`, lalu
    `ACTION_DEFS` (map `idFitur → [label aksi...]`) dan turunkan `ACTIONS`.
 3. Tulis `DATA_EDGES` = relasi data antar-fitur `[dari, ke, field_kunci]`.
-4. Jalankan `npx dyalisis test` → harus 46/46 PASS.
+4. Jalankan `npx dyalisis test` → harus 65/65 PASS.
 5. `npx dyalisis build` → `dist/index.html` (+ `dist/graph.json`).
 
 **Tips model:** domain = kelompok fungsional (bukan tim). Fitur = fungsi utama
@@ -253,11 +284,19 @@ setelah `layoutstop`).
 
 ## 8. Testing
 
-`npm test` menjalankan `test/run.mjs` headless (tanpa browser) dan menguji:
-integritas hierarki (8), compound boundary boxes (2), keep-set seleksi
-compound-aware (2), dan bahwa dagre + ELK benar-benar menghasilkan posisi (3).
-Semua target diambil **dari data** — tidak ada id aplikasi yang di-hardcode,
-sehingga test jalan untuk content apa pun.
+`npm test` menjalankan `test/run.mjs` headless (tanpa browser) dan menguji (65
+check): integritas hierarki + kontrak content, compound boundary boxes, keep-set
+seleksi compound-aware, posisi dagre + ELK, jalur Alur (`buildActivePath`),
+resolusi selector bahasa visual, analisis graf (`src/lib/analysis.js`), dan
+parser spec (`lib/spec.mjs` + `src/lib/erd.js`). Semua target diambil **dari
+data** — tidak ada id aplikasi yang di-hardcode, sehingga test jalan untuk
+content apa pun.
+
+Check parser spec menulis fixture sendiri ke temp dir (`mkdtempSync`), jadi
+`npm test` tetap hijau tanpa folder spec aplikasi nyata: `parseErd` diuji atas
+literal erDiagram (entitas/atribut/PK/relasi/kardinalitas), dan `parseSpecDir`
+atas spec mini (kontrak content valid: id unik, `mod-<domain>`, modul≥1 fitur,
+fitur≥1 aksi, domain valid; plus DATA_EDGES, LEVELS/`levelOf`, registry).
 
 ## 9. Arsitektur (mengapa begini)
 

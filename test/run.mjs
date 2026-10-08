@@ -5,7 +5,8 @@
 import { createRequire } from 'node:module';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ENGINE = resolve(__dirname, '..');          // direktori paket (engine)
@@ -45,6 +46,9 @@ const { buildActivePath } = await import(pathToFileURL(resolve(ENGINE, 'src/lib/
 const { buildGraphStyle, graphPalette } = await import(pathToFileURL(resolve(ENGINE, 'src/lib/graph-style.js')).href);
 const { buildModel, degreeMap, godNodes, crossModuleLinks, isolatedFeatures, analyze, toGraphJson, noteInfo } =
   await import(pathToFileURL(resolve(ENGINE, 'src/lib/analysis.js')).href);
+// Parser spec Markdown 4-aksis (Node-only) — dipakai flag `build --spec`.
+const { parseSpecDir, parseErd, cardLabel } =
+  await import(pathToFileURL(resolve(ENGINE, 'lib/spec.mjs')).href);
 
 // Registrasi extensions (dagre/elk export berupa fungsi register).
 for (const ext of [dagre, elk]) {
@@ -296,6 +300,122 @@ function buildStyled(theme) {
   check('analysis: toGraphJson menormalkan note ke { text, provenance }',
     gj.nodes.every((n) => n.note == null
       || (typeof n.note.text === 'string' && ['spec', 'inferred'].includes(n.note.provenance))));
+}
+
+// ===== 8. Parser spec Markdown 4-aksis (lib/spec.mjs) =====
+// Fixture ditulis ke temp dir supaya `npm test` tetap hijau tanpa folder spec
+// aplikasi nyata (content-agnostic; asersi pakai literal, bukan data app).
+{
+  const erdLit = [
+    'erDiagram',
+    '  PASIEN {',
+    '    string no_rm PK "nomor rekam medis"',
+    '    string nik',
+    '  }',
+    '  PASIEN ||--o{ KUNJUNGAN : "punya"',
+    '  KUNJUNGAN {',
+    '    string id PK',
+    '  }'
+  ].join('\n');
+  const E = parseErd(erdLit);
+  const entNames = E.entities.map((e) => e.name);
+  check('parseErd: memuat entitas (blok + rujukan relasi)',
+    entNames.includes('PASIEN') && entNames.includes('KUNJUNGAN'), entNames.join(','));
+  const pasien = E.entities.find((e) => e.name === 'PASIEN');
+  check('parseErd: atribut + tipe + PK + note ter-parse',
+    pasien.attrs.length === 2 && pasien.attrs[0].name === 'no_rm' &&
+    pasien.attrs[0].type === 'string' && pasien.attrs[0].key === 'PK' &&
+    pasien.attrs[0].note === 'nomor rekam medis', JSON.stringify(pasien.attrs));
+  check('parseErd: relasi + kardinalitas crow-foot + label',
+    E.relations.length === 1 && E.relations[0].from === 'PASIEN' && E.relations[0].to === 'KUNJUNGAN' &&
+    E.relations[0].fromCard === '||' && E.relations[0].toCard === 'o{' &&
+    E.relations[0].identifying === true && E.relations[0].label === 'punya', JSON.stringify(E.relations));
+  check('cardLabel: || → 1, o{ → 0..N', cardLabel('||') === '1' && cardLabel('o{') === '0..N',
+    `${cardLabel('||')} / ${cardLabel('o{')}`);
+
+  const root = mkdtempSync(resolve(tmpdir(), 'dyalisis-spec-'));
+  const specDir = resolve(root, 'spec');
+  mkdirSync(specDir, { recursive: true });
+  writeFileSync(resolve(root, '00-INDEX.md'), '# 00-INDEX — Aplikasi Uji\n\nRegistri fitur.\n');
+  writeFileSync(resolve(root, 'feature-registry.md'), [
+    '## 3. Registri',
+    '| Fitur | Nama | Sumber | Level | Status |',
+    '|---|---|---|---|---|',
+    '| `f-a` | Fitur A | `APP:src/a.ts`; `APP:src/a2.ts` | PROVEN | stabil |',
+    '| `f-b` | Fitur B | `APP:src/b.ts` | OBSERVED | draft |'
+  ].join('\n') + '\n');
+  writeFileSync(resolve(specDir, 'spec-01-uji.md'), [
+    '# Spec 01 — Modul Uji (`mod-uji`)',
+    '',
+    '> Ruang lingkup modul uji.',
+    '',
+    '```mermaid',
+    erdLit,
+    '```',
+    '',
+    '### `f-a` — Fitur A · cluster `mod-uji`',
+    '',
+    '- **Brief.** Ringkasan A.',
+    '- **Goals.** Tujuan A.',
+    '- **Workflow.** (1) Daftar → (2) Verifikasi → (3) Simpan',
+    '- **Entity.** `pasien` (no_rm, nik); `kunjungan` (id).',
+    '',
+    '### `f-b` — Fitur B · cluster `mod-uji`',
+    '',
+    '- **Brief.** Ringkasan B.',
+    '- **Goals.** Tujuan B.',
+    '- **Workflow.** Buka → Tutup',
+    '- **Entity.** `pasien` (no_rm, nik).',
+    ''
+  ].join('\n') + '\n');
+
+  const S = parseSpecDir(specDir);
+  const Sids = [S.ROOT.id, ...S.MODULES.map((m) => m.id), ...S.NODES.map((n) => n.id), ...S.ACTIONS.map((a) => a.id)];
+  check('spec: APP name dari 00-INDEX', S.APP.name === 'Aplikasi Uji', S.APP.name);
+  check('spec: satu modul mod-uji (domain uji)', S.MODULES.length === 1 &&
+    S.MODULES[0].id === 'mod-uji' && S.MODULES[0].domain === 'uji', S.MODULES.map((m) => m.id).join(','));
+  check('spec: modul menyimpan ERD (erDiagram) + intro spec',
+    /erDiagram/.test(S.MODULES[0].erd) && S.MODULES[0].spec.length > 0);
+  check('spec: dua fitur ter-parse dengan id benar', S.NODES.length === 2 &&
+    S.NODES.map((n) => n.id).sort().join(',') === 'f-a,f-b', S.NODES.map((n) => n.id).join(','));
+  check('spec: fitur membawa brief/goals/workflow', S.NODES.every((n) => n.brief && n.goals && n.workflow));
+  check('spec: fitur membawa entitas ter-parse',
+    S.NODES.every((n) => n.entities.length >= 1 && n.entities[0].name === 'pasien'));
+  check('spec: atribut entitas ter-isi tipe dari ERD',
+    (S.NODES[0].entities[0].attrs.find((a) => a.name === 'no_rm') || {}).type === 'string');
+  check('spec: sumber/level/status dari registry',
+    S.NODES[0].sources.length === 2 && S.NODES[0].evidence === 'PROVEN' && S.NODES[0].status === 'stabil');
+  check('spec: aksi diturunkan dari Workflow (id fitur~k)',
+    S.ACTIONS.every((a) => a.id.startsWith(a.parent + '~')) &&
+    S.ACTIONS.filter((a) => a.parent === 'f-a').length === 3, `${S.ACTIONS.length}`);
+  check('spec: DATA_EDGES menghubungkan fitur berbagi entitas', S.DATA_EDGES.length === 1 &&
+    S.DATA_EDGES[0][0] === 'f-a' && S.DATA_EDGES[0][1] === 'f-b' && S.DATA_EDGES[0][2] === 'pasien',
+    JSON.stringify(S.DATA_EDGES));
+  check('spec: LEVELS + levelOf konsisten', S.LEVELS[0].length === 1 && S.LEVELS[1].length === 1 &&
+    S.LEVELS[2].length === 2 && S.levelOf('f-a') === 2 && S.levelOf('f-a~0') === 3);
+  check('spec: kontrak valid (id unik, mod-<domain>, modul≥1 fitur, fitur≥1 aksi, domain valid)',
+    new Set(Sids).size === Sids.length &&
+    S.MODULES.every((m) => m.id === `mod-${m.domain}` && S.NODES.some((n) => `mod-${n.domain}` === m.id)) &&
+    S.NODES.every((n) => S.ACTIONS.some((a) => a.parent === n.id)) &&
+    [...S.NODES, ...S.ACTIONS].every((n) => S.DOMAINS[n.domain]));
+
+  // Proyeksi spec → consumers non-UI: field 4-aksis harus ikut di graph.json
+  // (toGraphJson) dan di balasan MCP (viewNode pakai helper yang sama).
+  const gjS = toGraphJson(S);
+  const gFeat = gjS.nodes.find((n) => n.id === 'f-a');
+  const gMod = gjS.nodes.find((n) => n.id === 'mod-uji');
+  check('spec: toGraphJson membawa field 4-aksis fitur (brief/goals/workflow/entities/sources/evidence/status)',
+    !!gFeat && gFeat.brief === 'Ringkasan A.' && gFeat.goals === 'Tujuan A.' &&
+    typeof gFeat.workflow === 'string' && Array.isArray(gFeat.entities) &&
+    gFeat.entities[0].name === 'pasien' && gFeat.sources.length === 2 &&
+    gFeat.evidence === 'PROVEN' && gFeat.status === 'stabil', JSON.stringify(gFeat));
+  check('spec: toGraphJson membawa ERD + intro modul',
+    !!gMod && /erDiagram/.test(gMod.erd) && gMod.spec.length > 0);
+  check('spec: field spec hanya muncul bila ada (node tanpa spec tak dapat field)',
+    gjS.nodes.filter((n) => n.type === 'action').every((n) =>
+      !('brief' in n) && !('entities' in n) && !('erd' in n)));
+
+  rmSync(root, { recursive: true, force: true });
 }
 
 console.log(failures === 0 ? '\nAll tests passed.' : `\n${failures} test(s) failed.`);

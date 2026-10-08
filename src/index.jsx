@@ -9,6 +9,7 @@ import { cn } from './lib/utils.js';
 import GraphCanvas from './components/GraphCanvas.jsx';
 import Legend from './components/Legend.jsx';
 import UmlDiagram from './components/UmlDiagram.jsx';
+import ErdDiagram from './components/ErdDiagram.jsx';
 import DocsPanel from './components/DocsPanel.jsx';
 import InsightPanel from './components/InsightPanel.jsx';
 import {
@@ -213,6 +214,13 @@ export default function DyalisisApp() {
     () => (umlNode ? allNodes.filter((n) => n.parent === umlNode.id) : []),
     [umlNode, allNodes]
   );
+  // ERD modul: node modul pakai dirinya; fitur/aksi pakai modul induknya
+  // (spec Markdown menaruh ERD di tingkat modul, bukan per fitur).
+  const erdModule = React.useMemo(() => {
+    if (!selected) return null;
+    if (selected.type === 'module') return selected;
+    return byIdAll[`mod-${selected.domain}`] || null;
+  }, [selected, byIdAll]);
 
   // Mode Alur: susun SATU jalur aktif dari fitur start menuju hilir — selektif,
   // bukan sub-grafik penuh (yang di graph kecil menyalakan hampir semua node,
@@ -678,6 +686,82 @@ export default function DyalisisApp() {
                       {selectedNote.text}
                     </p>
                   </div>
+                )}
+                {/* Spesifikasi — sumbu 4-aksis dari spec Markdown (content hasil
+                    `--spec`): prosa modul, Brief/Goals/Workflow/Entity, plus
+                    sumber + level bukti + status. Baca-saja, dari content. */}
+                {selected.type === 'module' && selected.spec && (
+                  <div>
+                    <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Ruang lingkup modul</p>
+                    <p className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">{selected.spec}</p>
+                  </div>
+                )}
+                {umlNode && (umlNode.brief || umlNode.goals || umlNode.workflow) && (
+                  <div className="space-y-2 rounded-md border bg-muted/20 p-2.5">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Spesifikasi</p>
+                    {umlNode.brief && (
+                      <div>
+                        <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Brief</p>
+                        <p className="text-xs leading-relaxed">{umlNode.brief}</p>
+                      </div>
+                    )}
+                    {umlNode.goals && (
+                      <div>
+                        <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Goals</p>
+                        <p className="text-xs leading-relaxed">{umlNode.goals}</p>
+                      </div>
+                    )}
+                    {umlNode.workflow && (
+                      <div>
+                        <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Workflow</p>
+                        <ol className="space-y-0.5">
+                          {umlNode.workflow.split('→').map((s, i) => (
+                            <li key={i} className="flex gap-1.5 text-xs leading-relaxed">
+                              <span className="shrink-0 text-muted-foreground">{i + 1}.</span>
+                              <span>{s.trim().replace(/^\(\d+\)\s*/, '')}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                    {Array.isArray(umlNode.entities) && umlNode.entities.length > 0 && (
+                      <div>
+                        <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Entity</p>
+                        <div className="space-y-1">
+                          {umlNode.entities.map((e) => (
+                            <div key={e.name}>
+                              <code className="text-[11px] font-medium">{e.name}</code>
+                              <code className="block rounded bg-muted px-2 py-1 text-[10px] text-muted-foreground">
+                                {e.attrs.map((a) => a.name + (a.key ? ` ${a.key}` : '')).join(', ') || '-'}
+                              </code>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {((umlNode.sources && umlNode.sources.length > 0) || umlNode.evidence || umlNode.status) && (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        {umlNode.evidence && (
+                          <span className={cn('rounded px-1 py-px text-[9px] font-medium',
+                            umlNode.evidence === 'PROVEN' ? 'bg-emerald-400/15 text-emerald-600 dark:text-emerald-400'
+                              : umlNode.evidence === 'OBSERVED' ? 'bg-sky-400/15 text-sky-600 dark:text-sky-400'
+                              : 'bg-amber-400/15 text-amber-600 dark:text-amber-400')}
+                            title="Level bukti">
+                            {umlNode.evidence}
+                          </span>
+                        )}
+                        {umlNode.status && (
+                          <span className="rounded bg-muted px-1 py-px text-[9px] font-medium text-muted-foreground">{umlNode.status}</span>
+                        )}
+                        {umlNode.sources && umlNode.sources.map((s, i) => (
+                          <code key={i} className="rounded bg-muted px-1 py-px text-[9px] text-muted-foreground" title={s}>{s}</code>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {erdModule && erdModule.erd && (
+                  <ErdDiagram erd={erdModule.erd} domains={domains} domain={erdModule.domain} theme={theme} />
                 )}
                 {umlNode && (
                   <UmlDiagram node={umlNode} byId={byIdAll} related={umlRelated}

@@ -21,7 +21,7 @@ Kontrak kontribusi ringkas untuk AI agent ada di
 
 ```bash
 npm install
-npm test          # 46 self-check headless (semua harus PASS)
+npm test          # 65 self-check headless (semua harus PASS)
 npm run build     # → dist/index.html + dist/graph.json (demo dari src/data/example.js)
 ```
 
@@ -42,6 +42,8 @@ npm run build     # → dist/index.html + dist/graph.json (demo dari src/data/ex
 | Check verifikasi | `test/run.mjs` | `check('nama', kondisi)` |
 | File proyek hasil scaffold | `lib/scaffold.mjs` | apa yang di-copy saat `init` |
 | Alur CLI | `bin/dyalisis.mjs` | init / build / test / login / publish / list / serve |
+| Ingest spec Markdown → content | `lib/spec.mjs` + `src/lib/erd.js` | parser Node-only (dipakai `build --spec`); `erd.js` isomorphic (Node + browser) |
+| Renderer ERD | `src/components/ErdDiagram.jsx` | SVG inline dari `erDiagram`, tema-aware, tanpa dependency |
 | Client publish | `lib/publish.mjs` | resolveConfig, publishHtml, login/list |
 | Slug unik & sanitize | `lib/slug.mjs` | `slugify`, `isSafeSlug` (dipakai client + server) |
 | Server penerbit | `server/publish-server.mjs`, `server/store.mjs` | route HTTP + storage filesystem |

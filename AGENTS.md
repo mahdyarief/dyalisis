@@ -9,8 +9,9 @@ lengkapnya ada di **`.claude/skills/dyalisis/SKILL.md`** — baca itu dulu.
 
 ```bash
 npx dyalisis init <nama-app>   # scaffold proyek content baru (folder + stub)
-npx dyalisis test              # 46 self-check headless, harus hijau
+npx dyalisis test              # 65 self-check headless, harus hijau
 npx dyalisis build             # → dist/index.html + dist/graph.json
+npx dyalisis build --spec dir  # build dari spec Markdown 4-aksis (tanpa content.js)
 npx dyalisis login <handle>    # daftar identitas → simpan token
 npx dyalisis publish           # build + unggah → URL publik (slug unik otomatis)
 npx dyalisis list --remote     # lihat publikasi milikmu
@@ -36,8 +37,14 @@ Detail lengkap: `.claude/skills/dyalisis/SKILL.md` §10.
 
 1. Pelajari aplikasi target → susun hierarki 4 level: Aplikasi → Modul → Fitur → Aksi.
 2. `npx dyalisis init <app>` → isi `dyalisis.content.js` sesuai kontrak (SKILL.md §4).
-3. `npx dyalisis test` → perbaiki sampai **46/46 PASS**.
+3. `npx dyalisis test` → perbaiki sampai **65/65 PASS**.
 4. `npx dyalisis build` → hasilkan `dist/index.html` (+ `dist/graph.json`).
+
+Alternatif bila fitur sudah terdokumentasi sebagai **spec Markdown 4-aksis**
+(Brief/Goals/Workflow/Entity + `erDiagram`): lompati langkah 2 dan build langsung
+dengan `npx dyalisis build --spec ./feature-analysis/spec`. Parser memetakan spec
+ke kontrak content di build time (detail: `README.md` §Dari spec Markdown /
+`lib/spec.mjs`).
 
 ## Konvensi yang tidak boleh dilanggar
 
