@@ -35,7 +35,7 @@ Implikasi penting mode tertutup:
 
 Deploy nyata yang berjalan memakai pola di dokumen ini:
 
-- **Container** `dyalisis:0.1.0` (image dari `Dockerfile` di repo, meng-install
+- **Container** `dyalisis:0.2.0` (image dari `Dockerfile` di repo, meng-install
   paket `dyalisis` dari npm) di direktori `/opt/dyalisis`, port `127.0.0.1:8787`.
 - **Tunnel** `cloudflared-dyalisis.service` (config `/etc/cloudflared/dyalisis.yml`,
   ingress → `http://localhost:8787`).

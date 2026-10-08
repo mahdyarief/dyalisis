@@ -1,6 +1,6 @@
 {
   "name": "dyalisis",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Feature-analysis visualization engine (Cytoscape.js + shadcn/ui) — flow/flowchart/UML/node-flow for app documentation. Compiled to single self-contained HTML. Engine & content detachable. Framework: Dyalisis.",
   "type": "module",
   "bin": {
