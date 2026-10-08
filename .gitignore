@@ -17,3 +17,4 @@ src/data/*
 .DS_Store
 Thumbs.db
 *.log
+*.openclaude.tmp

@@ -50,6 +50,12 @@ menyusun perspektif **C4 Model**, **arc42** (12 seksi lengkap), daftar **ADR**
 **Diátaxis** (artefak nyata dari data). Tiap seksi punya default turunan dari
 data; content boleh menimpanya lewat `ARC42`/`DOCS`.
 
+Tata letak **responsif tiga tingkat** (mobile `<640px`, tablet `640–1023px`,
+desktop `≥1024px`): sidebar menyatu (docked) mulai breakpoint tablet, dan di
+bawahnya jadi panel geser. Transisi panel/drawer, morf layout graf, dan
+micro-interaction tombol dianimasikan halus, dan semuanya otomatis dinonaktifkan
+saat OS meminta `prefers-reduced-motion`.
+
 ## Quickstart
 
 Pakai sebagai framework npm — buat proyek content baru, lalu isi data aplikasi:
@@ -152,6 +158,14 @@ Endpoint `.json`/`.md`/`llms.txt` hanya muncul bila `graph.json` ada (hasil
 **token publish yang sama**: bila server mode tertutup (`DYALISIS_PUBLISH_TOKEN`),
 kirim via header `X-Dyalisis-Token` (atau `Authorization: Bearer`); bila terbuka,
 tanpa token.
+
+Setiap halaman yang diterbitkan juga menyematkan **tag auto-discovery**
+(`<link rel="alternate" type="text/markdown">`, `<link rel="alternate"
+type="application/json">`, `<link rel="llms.txt">`), sehingga agent yang hanya
+diberi URL halaman bisa menemukan permukaan machine-readable tanpa konfigurasi
+tambahan. Di sisi aplikasi, ikon **✨ di header** membuka panel **Integrasi AI**
+yang menampilkan semua endpoint di atas (di-derive dari URL saat runtime) plus
+prompt siap-tempel untuk agent.
 
 ### Username/handle bebas? Tergantung mode server
 
