@@ -6,7 +6,7 @@
 services:
   dyalisis:
     build: .
-    image: dyalisis:0.2.0
+    image: dyalisis:0.2.1
     container_name: dyalisis
     restart: unless-stopped
     ports:
