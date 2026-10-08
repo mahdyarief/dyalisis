@@ -21,7 +21,7 @@ Kontrak kontribusi ringkas untuk AI agent ada di
 
 ```bash
 npm install
-npm test          # 65 self-check headless (semua harus PASS)
+npm test          # 77 self-check headless (semua harus PASS)
 npm run build     # → dist/index.html + dist/graph.json (demo dari src/data/example.js)
 ```
 
@@ -34,19 +34,20 @@ npm run build     # → dist/index.html + dist/graph.json (demo dari src/data/ex
 | Algoritma Mode Alur | `src/lib/flow.js` — `buildActivePath` | kembalikan `{ path, edges, branches }` |
 | Analisis graf (hub/coupling/provenance) | `src/lib/analysis.js` | fungsi murni isomorphic; dipakai build + UI + test + MCP |
 | Panel Insight sidebar | `src/components/InsightPanel.jsx` | tampil saat tak ada node terpilih |
-| Server MCP | `lib/mcp.mjs` | `serve --mcp`, JSON-RPC stdio tanpa dependency |
+| Server MCP | `lib/mcp.mjs` + `lib/graph-tools.mjs` | `serve --mcp` (stdio) + HTTP `/<slug>/mcp` berbagi logika tool yang sama |
+| Proyeksi Markdown/llms.txt | `lib/graph-md.mjs` | murni dari graph.json (endpoint `/<slug>.md`, `/<slug>/llms.txt`) |
 | Seksi panel Dokumentasi | `src/components/DocsPanel.jsx` | C4 / arc42 / ADR / glosarium / Diátaxis |
 | Diagram per-node | `src/components/UmlDiagram.jsx` | SVG inline, theme-aware |
 | Legenda | `src/components/Legend.jsx` | ikut saat tambah kelas visual baru |
 | Wiring app / state | `src/index.jsx` | data → elemen cytoscape, toolbar, sidebar |
 | Check verifikasi | `test/run.mjs` | `check('nama', kondisi)` |
 | File proyek hasil scaffold | `lib/scaffold.mjs` | apa yang di-copy saat `init` |
-| Alur CLI | `bin/dyalisis.mjs` | init / build / test / login / publish / list / serve |
+| Alur CLI | `bin/dyalisis.mjs` | init / build / test / login / publish / delete / list / serve |
 | Ingest spec Markdown → content | `lib/spec.mjs` + `src/lib/erd.js` | parser Node-only (dipakai `build --spec`); `erd.js` isomorphic (Node + browser) |
 | Renderer ERD | `src/components/ErdDiagram.jsx` | SVG inline dari `erDiagram`, tema-aware, tanpa dependency |
-| Client publish | `lib/publish.mjs` | resolveConfig, publishHtml, login/list |
+| Client publish | `lib/publish.mjs` | resolveConfig, publishHtml, login/list/delete |
 | Slug unik & sanitize | `lib/slug.mjs` | `slugify`, `isSafeSlug` (dipakai client + server) |
-| Server penerbit | `server/publish-server.mjs`, `server/store.mjs` | route HTTP + storage filesystem |
+| Server penerbit | `server/publish-server.mjs`, `server/store.mjs` | route HTTP (publish/delete/artefak AI/MCP) + storage filesystem |
 | Bundling | `build.mjs` | esbuild + tailwind → inline |
 
 ## Konvensi wajib

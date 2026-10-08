@@ -98,7 +98,13 @@ export async function buildDyalisis({ engineDir = ENGINE_DIR, projectDir = proce
     { stdio: 'inherit', cwd: engineDir }
   );
 
-  // 3. Inline CSS+JS ke template → output final.
+  // 3. Import content sekali — dipakai untuk nama app (<title>) dan graph.json.
+  //    Membaca modul jauh lebih andal daripada regex atas source, yang gagal
+  //    pada key ber-quote hasil JSON.stringify (`"name":`).
+  const C = await import(pathToFileURL(CONTENT).href);
+  const APP_NAME = C.APP?.name || 'Dyalisis';
+
+  // 4. Inline CSS+JS ke template → output final.
   const template = readFileSync(resolve(engineDir, 'template.html'), 'utf8');
   const css = readFileSync(resolve(tmp, 'styles.css'), 'utf8');
   const js = readFileSync(resolve(tmp, 'bundle.js'), 'utf8');
@@ -106,20 +112,13 @@ export async function buildDyalisis({ engineDir = ENGINE_DIR, projectDir = proce
   const html = template
     .replace('<!--DYALISIS_CSS-->', () => `<style>${css}</style>`)
     .replace('<!--DYALISIS_JS-->', () => `<script>${js}<\/script>`)
-    .replace('DYALISIS_APP_NAME', () => {
-      try {
-        const raw = readFileSync(CONTENT, 'utf8');
-        const m = /export const APP\s*=\s*\{[^}]*name:\s*['"]([^'"]+)['"]/.exec(raw);
-        return m ? m[1] : 'Dyalisis';
-      } catch { return 'Dyalisis'; }
-    });
+    .replace('DYALISIS_APP_NAME', () => APP_NAME);
   writeFileSync(OUT, html);
   rmSync(tmp, { recursive: true, force: true });
   console.log(`[dyalisis] DONE → ${OUT} (${(html.length / 1024).toFixed(0)} KB)`);
 
-  // 4. Export graph.json (model ternormalisasi + analisis) di samping HTML.
-  //    Dipakai untuk re-query tanpa browser, diff antar-build, dan server MCP.
-  const C = await import(pathToFileURL(CONTENT).href);
+  // 5. Export graph.json (model ternormalisasi + analisis) di samping HTML.
+  //    Dipakai untuk re-query tanpa browser, diff antar-build, dan server publish.
   const GRAPH_OUT = resolve(dirname(OUT), 'graph.json');
   writeFileSync(GRAPH_OUT, JSON.stringify(toGraphJson(C), null, 2) + '\n');
   console.log(`[dyalisis] graph   : ${GRAPH_OUT}`);

@@ -5,6 +5,13 @@ import { randomUUID } from 'node:crypto';
 import { resolve, join } from 'node:path';
 import { slugify, isSafeSlug } from '../lib/slug.mjs';
 
+/** Baca graph.json sebuah publikasi; null bila tak ada / rusak. */
+function readGraph(dir) {
+  const file = join(dir, 'graph.json');
+  if (!existsSync(file)) return null;
+  try { return JSON.parse(readFileSync(file, 'utf8')); } catch { return null; }
+}
+
 /**
  * @param {string} dataDir direktori data (dibuat bila belum ada)
  */
@@ -41,16 +48,17 @@ export function createStore(dataDir) {
       }
     },
 
-    /** Simpan artefak + metadata. */
-    save(slug, html, meta) {
+    /** Simpan artefak + metadata. `graph` (opsional) = model ternormalisasi. */
+    save(slug, html, meta, graph = null) {
       const dir = join(root, slug);
       mkdirSync(dir, { recursive: true });
       writeFileSync(join(dir, 'index.html'), html);
       writeFileSync(join(dir, 'meta.json'), JSON.stringify(meta, null, 2) + '\n');
+      if (graph) writeFileSync(join(dir, 'graph.json'), JSON.stringify(graph) + '\n');
       return meta;
     },
 
-    /** Ambil publikasi; null bila tak ada / slug tak aman. */
+    /** Ambil publikasi; null bila tak ada / slug tak aman. `graph` null bila tak ada. */
     get(slug) {
       if (!isSafeSlug(slug)) return null;
       const dir = join(root, slug);
@@ -58,7 +66,16 @@ export function createStore(dataDir) {
       if (!existsSync(file)) return null;
       let meta = { slug };
       try { meta = JSON.parse(readFileSync(join(dir, 'meta.json'), 'utf8')); } catch { /* biarkan */ }
-      return { html: readFileSync(file, 'utf8'), meta };
+      return { html: readFileSync(file, 'utf8'), meta, graph: readGraph(dir) };
+    },
+
+    /** Hapus publikasi; true bila terhapus, false bila tak ada / slug tak aman. */
+    remove(slug) {
+      if (!isSafeSlug(slug)) return false;
+      const dir = join(root, slug);
+      if (!existsSync(join(dir, 'meta.json'))) return false;
+      rmSync(dir, { recursive: true, force: true });
+      return true;
     },
 
     /** Daftar publikasi (opsional filter owner), terbaru dulu. */

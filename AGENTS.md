@@ -9,11 +9,12 @@ lengkapnya ada di **`.claude/skills/dyalisis/SKILL.md`** — baca itu dulu.
 
 ```bash
 npx dyalisis init <nama-app>   # scaffold proyek content baru (folder + stub)
-npx dyalisis test              # 65 self-check headless, harus hijau
+npx dyalisis test              # 77 self-check headless, harus hijau
 npx dyalisis build             # → dist/index.html + dist/graph.json
 npx dyalisis build --spec dir  # build dari spec Markdown 4-aksis (tanpa content.js)
 npx dyalisis login <handle>    # daftar identitas → simpan token
 npx dyalisis publish           # build + unggah → URL publik (slug unik otomatis)
+npx dyalisis delete <slug>     # hapus publikasi (mis. bersihkan orphan)
 npx dyalisis list --remote     # lihat publikasi milikmu
 npx dyalisis serve --mcp       # graf fitur sebagai tool MCP (stdio) untuk agent
 ```
@@ -33,11 +34,18 @@ content di repo ini memakai `src/data/example.js` sebagai demo.
 
 Detail lengkap: `.claude/skills/dyalisis/SKILL.md` §10.
 
+Setiap publikasi juga mengekspos permukaan **AI-friendly** di samping halaman HTML:
+`/<slug>.json` (graph.json), `/<slug>.md` (dokumentasi prosa), `/<slug>/llms.txt`
+(indeks), dan `POST /<slug>/mcp` (tool graf via JSON-RPC). Endpoint tulis
+(`/<slug>/mcp`, `DELETE /api/publications/<slug>`) memakai **token publish yang
+sama** bila server mode tertutup (header `X-Dyalisis-Token`). Detail: `README.md`
+§Permukaan AI-friendly untuk agent.
+
 ## Alur kerja agent
 
 1. Pelajari aplikasi target → susun hierarki 4 level: Aplikasi → Modul → Fitur → Aksi.
 2. `npx dyalisis init <app>` → isi `dyalisis.content.js` sesuai kontrak (SKILL.md §4).
-3. `npx dyalisis test` → perbaiki sampai **65/65 PASS**.
+3. `npx dyalisis test` → perbaiki sampai **77/77 PASS**.
 4. `npx dyalisis build` → hasilkan `dist/index.html` (+ `dist/graph.json`).
 
 Alternatif bila fitur sudah terdokumentasi sebagai **spec Markdown 4-aksis**

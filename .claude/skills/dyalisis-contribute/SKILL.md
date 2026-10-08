@@ -25,7 +25,7 @@ ada di [`CONTRIBUTING.md`](../../../CONTRIBUTING.md).
 
 ```bash
 npm install
-npm test          # 65 self-check headless (semua PASS)
+npm test          # 77 self-check headless (semua PASS)
 npm run build     # → dist/index.html + dist/graph.json (demo dari src/data/example.js)
 ```
 

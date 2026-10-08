@@ -1,16 +1,23 @@
 // Dyalisis publish server (zero-dep) — backend untuk `npx dyalisis publish`.
-//   POST /api/register            { handle }        → { token } (mode terbuka)
-//   POST /api/publish             (body HTML)       → { slug, url }
-//   GET  /api/publications?owner=                   → { publications: [...] }
-//   GET  /health                                    → { ok: true }
-//   GET  /                                          → direktori global (HTML)
-//   GET  /u/<owner>                                 → listing per-user (HTML)
-//   GET  /<slug>                                    → halaman publik (HTML)
+//   POST   /api/register            { handle }        → { token } (mode terbuka)
+//   POST   /api/publish             (body HTML | { html, graph }) → { slug, url }
+//   DELETE /api/publications/<slug>                   → { ok, slug }
+//   GET  /api/publications?owner=                     → { publications: [...] }
+//   GET  /health                                      → { ok: true }
+//   GET  /                                            → direktori global (HTML)
+//   GET  /u/<owner>                                   → listing per-user (HTML)
+//   GET  /<slug>                                      → halaman publik (HTML)
+//   GET  /<slug>.json                                 → graph.json (machine-readable)
+//   GET  /<slug>.md                                   → dokumentasi fitur (Markdown)
+//   GET  /<slug>/llms.txt                             → indeks llms.txt
+//   POST /<slug>/mcp                                  → tool graf via MCP (JSON-RPC/HTTP)
 // Env: PORT, DYALISIS_DATA_DIR, DYALISIS_PUBLISH_TOKEN, DYALISIS_PUBLIC_URL.
 import { createServer } from 'node:http';
 import { resolve } from 'node:path';
 import { createStore } from './store.mjs';
 import { slugify, isSafeSlug } from '../lib/slug.mjs';
+import { graphToMarkdown, graphToLlmsTxt } from '../lib/graph-md.mjs';
+import { handleMessage } from '../lib/graph-tools.mjs';
 
 const MAX_BODY = 25 * 1024 * 1024;
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
@@ -84,14 +91,34 @@ export function createPublishServer({ dataDir, token = '', publicUrl = '' } = {}
         }
         const desired = req.headers['x-dyalisis-slug'] || 'app';
         const overwrite = req.headers['x-dyalisis-overwrite'] === '1';
-        const html = (await readBody(req)).toString('utf8');
+        const raw = (await readBody(req)).toString('utf8');
+        // Envelope JSON { html, graph } (klien baru) atau HTML mentah (legacy).
+        let html = raw, graph = null;
+        if ((req.headers['content-type'] || '').includes('application/json')) {
+          let env;
+          try { env = JSON.parse(raw); } catch { return json(400, { ok: false, error: 'JSON tak valid' }); }
+          html = typeof env.html === 'string' ? env.html : '';
+          graph = env.graph && typeof env.graph === 'object' ? env.graph : null;
+        }
         if (!html.trim()) return json(400, { ok: false, error: 'body HTML kosong' });
         const slug = store.allocate(desired, overwrite);
         store.save(slug, html, {
           slug, owner, title: slug, bytes: Buffer.byteLength(html),
           createdAt: new Date().toISOString()
-        });
+        }, graph);
         return json(200, { ok: true, slug, url: `${base}/${slug}` });
+      }
+
+      // --- API: hapus publikasi (mis. membersihkan orphan) ---
+      if (req.method === 'DELETE' && path.startsWith('/api/publications/')) {
+        const slug = slugify(path.slice('/api/publications/'.length));
+        const clientToken = (req.headers.authorization || '').replace(/^Bearer\s+/i, '')
+          || req.headers['x-dyalisis-token'] || '';
+        if (requireToken) {
+          if (clientToken !== requireToken) return json(401, { ok: false, error: 'token salah' });
+        }
+        if (!store.remove(slug)) return json(404, { ok: false, error: 'publikasi tak ditemukan' });
+        return json(200, { ok: true, slug });
       }
 
       // --- API: listing ---
@@ -113,11 +140,55 @@ export function createPublishServer({ dataDir, token = '', publicUrl = '' } = {}
         return send(200, listingHtml('Direktori Publikasi', store.list()), 'text/html; charset=utf-8');
       }
 
-      // --- Halaman: artefak publik ---
+      // --- MCP-over-HTTP: POST /<slug>/mcp (JSON-RPC 2.0, balasan application/json) ---
+      if (req.method === 'POST' && path.endsWith('/mcp')) {
+        const slug = path.slice(1, -'/mcp'.length).replace(/\/+$/, '');
+        if (!isSafeSlug(slug)) return json(404, { jsonrpc: '2.0', id: null,
+          error: { code: -32600, message: 'slug tak valid' } });
+        // Otorisasi sama seperti publish: token server (bila mode tertutup).
+        if (requireToken) {
+          const clientToken = (req.headers.authorization || '').replace(/^Bearer\s+/i, '')
+            || req.headers['x-dyalisis-token'] || '';
+          if (clientToken !== requireToken) return json(401, { jsonrpc: '2.0', id: null,
+            error: { code: -32001, message: 'token salah' } });
+        }
+        const pub = store.get(slug);
+        if (!pub || !pub.graph) return json(404, { jsonrpc: '2.0', id: null,
+          error: { code: -32600, message: `graph.json publikasi "${slug}" tak tersedia` } });
+        let msg;
+        try { msg = JSON.parse((await readBody(req)).toString('utf8') || '{}'); } catch {
+          return json(400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'JSON tak valid' } });
+        }
+        const reply = handleMessage(pub.graph, msg);
+        // Notifikasi (tanpa id) → balas 202 kosong, sesuai transport MCP.
+        if (reply === null) return send(202, '', 'application/json');
+        return json(200, reply);
+      }
+
+      // --- Artefak AI-friendly: /<slug>.json, /<slug>.md, /<slug>/llms.txt ---
       if (req.method === 'GET') {
-        const slug = path.replace(/^\/+|\/+$/g, '');
-        if (isSafeSlug(slug)) {
-          const pub = store.get(slug);
+        const clean = path.replace(/^\/+|\/+$/g, '');
+        if (clean.endsWith('/llms.txt')) {
+          const slug = clean.slice(0, -'/llms.txt'.length);
+          const pub = isSafeSlug(slug) ? store.get(slug) : null;
+          if (pub && pub.graph) return send(200, graphToLlmsTxt(pub.graph, { base: `${base}/${slug}` }), 'text/plain; charset=utf-8');
+          return send(404, `# 404\n\nllms.txt untuk "${slug}" tak ditemukan.\n`, 'text/plain; charset=utf-8');
+        }
+        if (clean.endsWith('.json') || clean.endsWith('.md')) {
+          const isMd = clean.endsWith('.md');
+          const slug = clean.slice(0, isMd ? -3 : -5);
+          const pub = isSafeSlug(slug) ? store.get(slug) : null;
+          if (pub && pub.graph) {
+            return isMd
+              ? send(200, graphToMarkdown(pub.graph), 'text/markdown; charset=utf-8')
+              : send(200, JSON.stringify(pub.graph), 'application/json');
+          }
+          return send(404, isMd ? `# 404\n\nDokumentasi "${slug}" tak ditemukan.\n` : '{"ok":false,"error":"graph.json tak ditemukan"}',
+            isMd ? 'text/markdown; charset=utf-8' : 'application/json');
+        }
+        // --- Halaman: artefak publik (HTML) ---
+        if (isSafeSlug(clean)) {
+          const pub = store.get(clean);
           if (pub) return send(200, pub.html, 'text/html; charset=utf-8');
         }
         return send(404, page('404', '<h1>404</h1><p class="m">Publikasi tak ditemukan.</p>'), 'text/html; charset=utf-8');

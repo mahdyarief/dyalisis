@@ -69,7 +69,7 @@ Dipakai sebagai framework npm — scaffold proyek content baru:
 npx dyalisis init aplikasi-saya   # folder proyek + dyalisis.content.js (stub)
 cd aplikasi-saya
 npm install
-npx dyalisis test                 # 65 self-check headless → semua PASS
+npx dyalisis test                 # 77 self-check headless → semua PASS
 npx dyalisis build                # → dist/index.html + dist/graph.json
 ```
 
@@ -157,7 +157,7 @@ ERD (`erDiagram`) digambar `ErdDiagram.jsx` sebagai SVG inline
 (theme-aware, tanpa dependency) — renderer memakai parser isomorphic
 `src/lib/erd.js` yang sama dengan `lib/spec.mjs`.
 
-**Aturan struktur yang diuji `npm test` (65 check):**
+**Aturan struktur yang diuji `npm test` (77 check):**
 - `id` unik di seluruh node.
 - `parent` tiap node merujuk id yang ada; **tanpa siklus**.
 - `MODULES[i].id` **harus** `mod-<domain>` — engine menurunkan parent fitur dari
@@ -251,7 +251,7 @@ dot pada daftar langkah Alur, dan badge teks `spec`/`inferred` di sidebar.
 2. Isi `APP`, `DOMAINS` (label + warna), `ROOT`, `MODULES`, `NODES`, lalu
    `ACTION_DEFS` (map `idFitur → [label aksi...]`) dan turunkan `ACTIONS`.
 3. Tulis `DATA_EDGES` = relasi data antar-fitur `[dari, ke, field_kunci]`.
-4. Jalankan `npx dyalisis test` → harus 65/65 PASS.
+4. Jalankan `npx dyalisis test` → harus 77/77 PASS.
 5. `npx dyalisis build` → `dist/index.html` (+ `dist/graph.json`).
 
 **Tips model:** domain = kelompok fungsional (bukan tim). Fitur = fungsi utama
@@ -284,12 +284,13 @@ setelah `layoutstop`).
 
 ## 8. Testing
 
-`npm test` menjalankan `test/run.mjs` headless (tanpa browser) dan menguji (65
+`npm test` menjalankan `test/run.mjs` headless (tanpa browser) dan menguji (77
 check): integritas hierarki + kontrak content, compound boundary boxes, keep-set
 seleksi compound-aware, posisi dagre + ELK, jalur Alur (`buildActivePath`),
-resolusi selector bahasa visual, analisis graf (`src/lib/analysis.js`), dan
-parser spec (`lib/spec.mjs` + `src/lib/erd.js`). Semua target diambil **dari
-data** — tidak ada id aplikasi yang di-hardcode, sehingga test jalan untuk
+resolusi selector bahasa visual, analisis graf (`src/lib/analysis.js`),
+parser spec (`lib/spec.mjs` + `src/lib/erd.js`), dan tools/proyeksi
+`graph.json` (`lib/graph-tools.mjs`, `lib/graph-md.mjs`). Semua target diambil
+**dari data** — tidak ada id aplikasi yang di-hardcode, sehingga test jalan untuk
 content apa pun.
 
 Check parser spec menulis fixture sendiri ke temp dir (`mkdtempSync`), jadi

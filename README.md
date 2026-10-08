@@ -58,7 +58,7 @@ Pakai sebagai framework npm — buat proyek content baru, lalu isi data aplikasi
 npx dyalisis init aplikasi-saya   # scaffold folder proyek content
 cd aplikasi-saya
 npm install
-npx dyalisis test                 # 65 self-check headless → harus semua PASS
+npx dyalisis test                 # 77 self-check headless → harus semua PASS
 npx dyalisis build                # → dist/index.html + dist/graph.json
 ```
 
@@ -76,7 +76,7 @@ Buka `dist/index.html` di browser. AI agent cukup menyunting `dyalisis.content.j
 
 1. `npx dyalisis init <nama-app>` → folder proyek + `dyalisis.content.js` (stub).
 2. Isi `dyalisis.content.js` sesuai kontrak (§ Content contract di bawah).
-3. `npx dyalisis test` → harus **65/65 PASS**.
+3. `npx dyalisis test` → harus **77/77 PASS**.
 4. `npx dyalisis build` → `dist/index.html` (+ `dist/graph.json`).
 
 ## Dari spec Markdown 4-aksis (opsional)
@@ -120,6 +120,7 @@ npx dyalisis login <handle>             # sekali: daftar identitas → simpan to
 npx dyalisis publish                    # build + unggah (slug default = nama app)
 npx dyalisis publish --slug softmedis   # custom naming
 npx dyalisis publish --overwrite        # timpa publikasi lama (slug sama)
+npx dyalisis delete <slug>              # hapus publikasi (mis. bersihkan orphan)
 npx dyalisis list --remote              # lihat publikasi milikmu di server
 ```
 
@@ -128,6 +129,29 @@ Server penerbit (zero-dep, tanpa DB) ada di [`server/`](server); cara deploy ke
 VPS + HTTPS ada di [`DEPLOY.md`](DEPLOY.md). Endpoint & token diambil dari
 `--url`/`--token`, env `DYALISIS_PUBLISH_URL`/`DYALISIS_TOKEN`, atau
 `.dyalisisrc.json`.
+
+### Permukaan AI-friendly untuk agent
+
+`publish` mengunggah **HTML + `graph.json`** sekaligus. Selain halaman HTML
+interaktif, server menerbitkan representasi machine-readable supaya agent bisa
+menjadikan URL itu sumber dokumentasi/analisis fitur saat development (tanpa
+mengurai blob HTML/JS):
+
+| Surface | URL | Isi |
+|---|---|---|
+| Halaman interaktif | `https://<host>/<slug>` | HTML (manusia) |
+| Graph JSON | `https://<host>/<slug>.json` | model ternormalisasi (node/edge/analisis + field 4-aksis) |
+| Dokumentasi Markdown | `https://<host>/<slug>.md` | prosa per modul+fitur (brief/goals/workflow/entities/ERD) |
+| Indeks llms.txt | `https://<host>/<slug>/llms.txt` | ringkasan + pointer (konvensi [llmstxt.org](https://llmstxt.org)) |
+| MCP (Streamable HTTP) | `POST https://<host>/<slug>/mcp` | tool graf via JSON-RPC 2.0 |
+
+Endpoint `.json`/`.md`/`llms.txt` hanya muncul bila `graph.json` ada (hasil
+`build`); MCP-over-HTTP mengekspos tool yang sama persis dengan `serve --mcp`
+(`lib/graph-tools.mjs` dipakai bersama). Endpoint tulis (`POST /<slug>/mcp` dan
+`DELETE /api/publications/<slug>` — atau `dyalisis delete <slug>`) memakai
+**token publish yang sama**: bila server mode tertutup (`DYALISIS_PUBLISH_TOKEN`),
+kirim via header `X-Dyalisis-Token` (atau `Authorization: Bearer`); bila terbuka,
+tanpa token.
 
 ### Username/handle bebas? Tergantung mode server
 
@@ -194,16 +218,22 @@ dependency) yang mengekspos graf fitur sebagai tool untuk agent:
 `trace_flow`. Content di-resolve sama seperti `build` (dari cwd), jadi bisa
 dijalankan di dalam proyek content mana pun. Self-test: `npm run test:mcp`.
 
+Server publish juga mengekspos **tool yang sama via HTTP** di
+`POST https://<host>/<slug>/mcp` (lihat §Publish) — sehingga agent remote dapat
+meng-query publikasi tanpa clone repo. Kedua transport memakai implementasi tool
+yang sama (`lib/graph-tools.mjs`), jadi perilakunya identik.
+
 ## Struktur
 
 ```
-bin/dyalisis.mjs  CLI (init/build/test/publish/serve/login/list)
+bin/dyalisis.mjs  CLI (init/build/test/publish/delete/serve/login/list)
 build.mjs         bundler → HTML+graph.json  src/index.jsx     app React
 lib/scaffold.mjs  scaffolder proyek        src/components/     GraphCanvas + ui/*
 lib/patch-elk.mjs patch cytoscape-elk      src/lib/            layout + flow + analysis
-lib/publish.mjs   client publish           test/run.mjs        self-test (65)
+lib/publish.mjs   client publish           test/run.mjs        self-test (77)
 lib/slug.mjs      slug unik bersama        test/mcp.mjs        self-test MCP
 lib/mcp.mjs       server MCP stdio         test/publish.mjs    self-test publish
+lib/graph-tools.mjs tools graf (murni)     lib/graph-md.mjs    proyeksi MD/llms.txt
 server/           publish server (zero-dep, tanpa DB)
 src/data/         contoh content           template.html       shell HTML
 ```

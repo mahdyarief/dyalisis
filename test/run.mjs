@@ -49,6 +49,11 @@ const { buildModel, degreeMap, godNodes, crossModuleLinks, isolatedFeatures, ana
 // Parser spec Markdown 4-aksis (Node-only) — dipakai flag `build --spec`.
 const { parseSpecDir, parseErd, cardLabel } =
   await import(pathToFileURL(resolve(ENGINE, 'lib/spec.mjs')).href);
+// Tools + proyeksi AI-friendly atas graph.json (dipakai server publish & MCP HTTP).
+const { runTool, handleMessage } =
+  await import(pathToFileURL(resolve(ENGINE, 'lib/graph-tools.mjs')).href);
+const { graphToMarkdown, graphToLlmsTxt } =
+  await import(pathToFileURL(resolve(ENGINE, 'lib/graph-md.mjs')).href);
 
 // Registrasi extensions (dagre/elk export berupa fungsi register).
 for (const ext of [dagre, elk]) {
@@ -416,6 +421,56 @@ function buildStyled(theme) {
       !('brief' in n) && !('entities' in n) && !('erd' in n)));
 
   rmSync(root, { recursive: true, force: true });
+}
+
+// ===== 9. Tools + proyeksi graph.json (lib/graph-tools.mjs, lib/graph-md.mjs) =====
+// Dipakai server publish untuk endpoint AI-friendly (JSON/Markdown/llms.txt/MCP)
+// dan serve --mcp (stdio). Diuji di atas graph.json dari content demo.
+{
+  const graph = toGraphJson(C);
+  const summary = runTool(graph, 'graph_summary');
+  check('graph-tools: graph_summary punya counts + analisis',
+    summary.counts && summary.counts.features === NODES.length && Array.isArray(summary.godNodes));
+
+  const mods = runTool(graph, 'list_modules');
+  check('graph-tools: list_modules menampung fitur anak',
+    mods.length === MODULES.length && mods.every((m) => Array.isArray(m.features)));
+
+  const feat = NODES[0];
+  const got = runTool(graph, 'get_node', { id: feat.id });
+  check('graph-tools: get_node membawa id + anak', got.id === feat.id && Array.isArray(got.children));
+  check('graph-tools: get_node id tak ada → error',
+    typeof runTool(graph, 'get_node', { id: '__x__' }).error === 'string');
+
+  check('graph-tools: search_nodes mengembalikan array',
+    Array.isArray(runTool(graph, 'search_nodes', { query: feat.id.slice(0, 3) })));
+
+  // trace_flow: dari node ber-derajat data (bila ada) harus balas reachable/path.
+  const dataSrc = (DATA_EDGES || [])[0] && DATA_EDGES[0][0];
+  const flow = runTool(graph, 'trace_flow', { from: dataSrc || feat.id });
+  check('graph-tools: trace_flow balas reachable/path/error',
+    'reachable' in flow || 'path' in flow || 'error' in flow);
+
+  // Dispatch JSON-RPC (dipakai stdio MCP & HTTP MCP).
+  const init = handleMessage(graph, { id: 1, method: 'initialize' });
+  check('graph-tools: initialize → serverInfo dyalisis',
+    init.result.serverInfo.name === 'dyalisis' && init.result.protocolVersion);
+  check('graph-tools: tools/list memuat 6 tool',
+    handleMessage(graph, { id: 2, method: 'tools/list' }).result.tools.length === 6);
+  const call = handleMessage(graph, { id: 3, method: 'tools/call',
+    params: { name: 'get_node', arguments: { id: '__x__' } } });
+  check('graph-tools: tools/call id tak ada → isError', call.result.isError === true);
+  check('graph-tools: notifikasi (tanpa id) → null',
+    handleMessage(graph, { method: 'notifications/initialized' }) === null);
+
+  // Proyeksi Markdown + llms.txt.
+  const md = graphToMarkdown(graph);
+  check('graph-md: Markdown memuat judul app + prosa fitur', md.includes('# ') &&
+    md.includes('## Modul:') && md.includes('### Fitur:'));
+  const llms = graphToLlmsTxt(graph, { base: 'https://x.test/app' });
+  check('graph-md: llms.txt memuat pointer JSON/Markdown/MCP',
+    llms.includes('https://x.test/app.json') && llms.includes('https://x.test/app.md') &&
+    llms.includes('https://x.test/app/mcp'));
 }
 
 console.log(failures === 0 ? '\nAll tests passed.' : `\n${failures} test(s) failed.`);

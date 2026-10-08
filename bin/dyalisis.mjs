@@ -33,6 +33,8 @@ Pemakaian:
   npx dyalisis login <handle> [--url u]        daftar identitas → simpan token
   npx dyalisis publish [--slug nama] [--url u] [--token t] [--overwrite] [--no-build]
                                                publikasikan → URL publik
+  npx dyalisis delete <slug> [--url u] [--token t]
+                                               hapus publikasi dari server
   npx dyalisis list [--remote] [--url u]       riwayat publikasi (lokal/server)
   npx dyalisis serve [--port n] [--data dir] [--token t]
                                                jalankan publish server lokal
@@ -86,6 +88,12 @@ async function main() {
       overwrite: rest.includes('--overwrite') || rest.includes('--force'),
       build: !rest.includes('--no-build')
     });
+    return;
+  }
+
+  if (cmd === 'delete') {
+    const { deleteDyalisis } = await import(lib('lib/publish.mjs'));
+    await deleteDyalisis({ slug: positional(rest), url: flagValue(rest, '--url'), token: flagValue(rest, '--token') });
     return;
   }
 
