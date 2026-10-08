@@ -11,11 +11,12 @@ import Legend from './components/Legend.jsx';
 import UmlDiagram from './components/UmlDiagram.jsx';
 import ErdDiagram from './components/ErdDiagram.jsx';
 import DocsPanel from './components/DocsPanel.jsx';
+import AiPanel from './components/AiPanel.jsx';
 import InsightPanel from './components/InsightPanel.jsx';
 import {
   IconPlus, IconMinus, IconFit, IconDownload, IconSun, IconMoon,
   IconSearch, IconPanel, IconChevron, IconArrowRight, IconArrowLeft, IconTarget,
-  IconChevronDown, IconCheck, IconBook, IconClose, IconFilter
+  IconChevronDown, IconCheck, IconBook, IconClose, IconFilter, IconSparkle
 } from './components/icons.jsx';
 // Content layer — alias `@dyalisis/content` dipasang build.mjs; engine tetap
 // read-only karena tak ada file generated yang ditulis ke paket. Content diambil
@@ -24,11 +25,11 @@ import * as C from '@dyalisis/content';
 
 const APP = C.APP || { name: 'Dyalisis', subtitle: 'Feature Analysis Graph' };
 
-// Breakpoint desktop: panel samping inline (lg). Di bawahnya panel jadi drawer
-// overlay yang bisa dibuka/tutup — supaya kanvas tetap lega di layar kecil.
-const DESKTOP_MQ = '(min-width: 1024px)';
-const isDesktopViewport = () =>
-  typeof window !== 'undefined' && window.matchMedia(DESKTOP_MQ).matches;
+// Breakpoint: sidebar "docked" (inline) mulai tablet (≥640); di bawahnya jadi
+// drawer overlay. Label toolbar yang lebih padat tetap pakai utilitas `md:`/`lg:`.
+const DOCK_MQ = '(min-width: 640px)';
+const isDockedViewport = () =>
+  typeof window !== 'undefined' && window.matchMedia(DOCK_MQ).matches;
 
 // Pilihan level untuk filter facet (L1–L3) — dipakai tombol panel + chip aktif.
 const LEVEL_CHOICES = [[1, 'Modul'], [2, 'Fitur'], [3, 'Aksi']];
@@ -41,12 +42,13 @@ export default function DyalisisApp() {
   const [cyRef, setCyRef] = React.useState(null);
   const [showActions, setShowActions] = React.useState(false);
   const [theme, setTheme] = React.useState('dark');
-  const [sidebarOpen, setSidebarOpen] = React.useState(isDesktopViewport);
+  const [sidebarOpen, setSidebarOpen] = React.useState(isDockedViewport);
   const [layoutMenuOpen, setLayoutMenuOpen] = React.useState(false);
   const [flowMode, setFlowMode] = React.useState(false);
   const [flowStart, setFlowStart] = React.useState(null);       // fitur awal jalur Alur
   const [branchChoice, setBranchChoice] = React.useState({});   // { nodeId: successorId }
   const [docsOpen, setDocsOpen] = React.useState(false);
+  const [aiOpen, setAiOpen] = React.useState(false);
   const [filterMenuOpen, setFilterMenuOpen] = React.useState(false);
   // Filter facet — potong graf per domain, per level, atau hanya node ber-Catatan.
   // Melengkapi pencarian teks: facet berlaku lebih dulu, lalu query mempersempit.
@@ -278,6 +280,20 @@ export default function DyalisisApp() {
   // Posisi node terpilih di dalam jalur Alur (untuk navigasi langkah).
   const flowIdx = selected ? flowPath.indexOf(selected.id) : -1;
 
+  // Node cabang alternatif (successor yang TIDAK dipilih di tiap percabangan,
+  // jadi di luar jalur aktif) — dipakai GraphCanvas untuk menandai percabangan
+  // dengan gaya dashed agar terbaca sebagai cabang, bukan sekadar hilang.
+  const flowBranchIds = React.useMemo(() => {
+    const ids = new Set();
+    const posInPath = new Map(flowPath.map((id, i) => [id, i]));
+    Object.entries(flow.branches).forEach(([nodeId, succs]) => {
+      const i = posInPath.get(nodeId);
+      const chosenNext = i !== undefined ? flowPath[i + 1] : undefined;
+      succs.forEach((s) => { if (s !== chosenNext) ids.add(s); });
+    });
+    return [...ids];
+  }, [flow, flowPath]);
+
   // Pilih node + pastikan ia terlihat (jika tersembunyi karena filter/toggle).
   const selectNode = React.useCallback((id) => {
     const node = byIdAll[id];
@@ -322,7 +338,7 @@ export default function DyalisisApp() {
   // saat ukuran layar berubah (buka di desktop, tutup di mobile) supaya state
   // tidak nyangkut setelah rotasi/resize.
   React.useEffect(() => {
-    const mq = window.matchMedia(DESKTOP_MQ);
+    const mq = window.matchMedia(DOCK_MQ);
     const onChange = (e) => setSidebarOpen(e.matches);
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
@@ -330,7 +346,7 @@ export default function DyalisisApp() {
 
   // Di mobile, memilih node membuka drawer detail (di desktop panel sudah tampak).
   React.useEffect(() => {
-    if (selectedId && !window.matchMedia(DESKTOP_MQ).matches) setSidebarOpen(true);
+    if (selectedId && !window.matchMedia(DOCK_MQ).matches) setSidebarOpen(true);
   }, [selectedId]);
 
   // Terapkan tema ke <html> (kelas .dark) agar token shadcn ikut berubah.
@@ -409,6 +425,10 @@ export default function DyalisisApp() {
           <Button size="icon" variant="ghost" title="Dokumentasi arsitektur (C4 · arc42 · ADR · Diátaxis)"
             onClick={() => setDocsOpen(true)}>
             <IconBook />
+          </Button>
+          <Button size="icon" variant="ghost" title="Integrasi AI — link machine-readable untuk agent / LLM"
+            onClick={() => setAiOpen(true)}>
+            <IconSparkle />
           </Button>
           <Button size="icon" variant="ghost" title={theme === 'dark' ? 'Mode terang' : 'Mode gelap'}
             onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}>
@@ -535,7 +555,8 @@ export default function DyalisisApp() {
       <div className="flex min-h-0 flex-1">
         <main className="relative min-w-0 flex-1">
           <GraphCanvas nodes={filteredNodes} edges={edges} domains={domains} layoutName={layoutName}
-            selectedId={selectedId} matchIds={highlightIds} flowPath={graphFlowPath} notedIds={notedIds}
+            selectedId={selectedId} matchIds={highlightIds} flowPath={graphFlowPath} flowBranchIds={flowBranchIds}
+            notedIds={notedIds}
             theme={theme} onSelect={handleCanvasSelect} onReady={setCyRef} />
           <Legend domains={domains} showActions={showActions} flowActive={flowMode && graphFlowPath.length > 1}
             notedCount={notedIds.length} highlight={graphPalette(theme).highlight}
@@ -577,7 +598,7 @@ export default function DyalisisApp() {
         </main>
 
         {sidebarOpen && (
-          <div className="fixed inset-0 z-20 bg-black/40 backdrop-blur-sm lg:hidden"
+          <div className="fixed inset-0 z-20 bg-black/40 backdrop-blur-sm sm:hidden"
             onClick={() => setSidebarOpen(false)} aria-hidden="true" />
         )}
 
@@ -586,13 +607,13 @@ export default function DyalisisApp() {
           // Mobile: drawer overlay dari kanan (lebar tetap, geser masuk/keluar).
           'fixed inset-y-0 right-0 z-30 w-80 max-w-[85vw] border-l p-3 shadow-xl transition-transform duration-200',
           sidebarOpen ? 'translate-x-0' : 'translate-x-full',
-          // Desktop: kembali ke layout inline; lebar dikontrol lewat state.
-          'lg:static lg:z-auto lg:max-w-none lg:translate-x-0 lg:shadow-none lg:transition-none',
-          sidebarOpen ? 'lg:w-80 lg:p-3' : 'lg:w-0 lg:overflow-hidden lg:border-l-0 lg:p-0'
+          // Tablet & desktop: kembali ke layout inline (sidebar docked).
+          'sm:static sm:z-auto sm:max-w-none sm:translate-x-0 sm:shadow-none sm:transition-none',
+          sidebarOpen ? 'sm:w-64 sm:p-3 lg:w-80' : 'sm:w-0 sm:overflow-hidden sm:border-l-0 sm:p-0'
         )}>
           {/* Mobile-only: tombol tutup (drawer menutupi sebagian besar layar,
               jadi strip backdrop terlalu tipis untuk diandalkan). */}
-          <div className="mb-2 flex justify-end lg:hidden">
+          <div className="mb-2 flex justify-end sm:hidden">
             <Button size="icon" variant="ghost" title="Tutup panel"
               className="h-8 w-8" onClick={() => setSidebarOpen(false)}>
               <IconClose />
@@ -799,11 +820,32 @@ export default function DyalisisApp() {
                     </div>
                   </div>
                 )}
+                {!flowMode && selected && selected.type === 'feature' && related.length > 0 && (
+                  <div className="rounded border bg-muted/20 p-2">
+                    <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Alur data</p>
+                    <p className="mb-2 text-[11px] leading-snug text-muted-foreground">
+                      {related.filter((r) => !r.out).length} masuk · {related.filter((r) => r.out).length} keluar —
+                      lacak jalur end-to-end dari fitur ini.
+                    </p>
+                    <Button size="sm" variant="outline" className="w-full gap-1" onClick={toggleFlow}>
+                      <IconSparkle className="h-3.5 w-3.5" /> Lacak alur dari sini
+                    </Button>
+                  </div>
+                )}
                 {flowMode && flowPath.length > 1 && (
                   <div>
-                    <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Alur — jalur aktif ({flowPath.length} langkah)
-                    </p>
+                    <div className="mb-1.5 flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Alur — jalur aktif</p>
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                        {flowIdx >= 0 ? `Langkah ${flowIdx + 1} / ${flowPath.length}` : `${flowPath.length} langkah`}
+                      </span>
+                    </div>
+                    {flowIdx >= 0 && (
+                      <div className="mb-2 h-1 w-full overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full bg-primary transition-all duration-300"
+                          style={{ width: `${((flowIdx + 1) / flowPath.length) * 100}%` }} />
+                      </div>
+                    )}
                     <div className="space-y-1">
                       {flowPath.map((id, i) => {
                         const n = byIdAll[id];
@@ -817,8 +859,13 @@ export default function DyalisisApp() {
                             <button className={cn('flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-muted',
                               id === selectedId && 'bg-muted font-medium')}
                               onClick={() => selectNode(id)}>
-                              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] text-muted-foreground">{i + 1}</span>
+                              <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px]',
+                                i === 0 ? 'bg-emerald-500 text-white'
+                                  : i === flowPath.length - 1 ? 'bg-amber-500 text-white'
+                                    : 'bg-muted text-muted-foreground')}>{i + 1}</span>
                               <span className="flex-1 truncate">{n ? n.label : id}</span>
+                              {i === 0 && <span className="shrink-0 text-[9px] font-medium uppercase tracking-wide text-emerald-500">mulai</span>}
+                              {i === flowPath.length - 1 && i !== 0 && <span className="shrink-0 text-[9px] font-medium uppercase tracking-wide text-amber-500">akhir</span>}
                               {notes[id] && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-pink-400" title="punya catatan" />}
                             </button>
                             {branches.length > 1 && (
@@ -846,10 +893,16 @@ export default function DyalisisApp() {
                         <IconArrowLeft className="h-3.5 w-3.5" /> Sebelumnya
                       </Button>
                       <Button size="sm" variant="outline" className="flex-1 gap-1" disabled={flowIdx < 0 || flowIdx >= flowPath.length - 1}
-                        onClick={() => selectNode(flowPath[flowIdx + 1])}>
+                        onClick={() => selectNode(flowPath[flowIdx + 1])}
+                        title={flowIncoming[flowPath[flowIdx + 1]] ? `via ${flowIncoming[flowPath[flowIdx + 1]]}` : undefined}>
                         Berikutnya <IconArrowRight className="h-3.5 w-3.5" />
                       </Button>
                     </div>
+                    {flowIdx >= 0 && flowIdx < flowPath.length - 1 && flowIncoming[flowPath[flowIdx + 1]] && (
+                      <p className="mt-1 text-center text-[9px] italic text-muted-foreground">
+                        langkah berikutnya via {flowIncoming[flowPath[flowIdx + 1]]}
+                      </p>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -881,6 +934,7 @@ export default function DyalisisApp() {
           decisions={C.DECISIONS || []} arc42={C.ARC42 || []} glossary={C.GLOSSARY || []}
           docs={C.DOCS || []} onClose={() => setDocsOpen(false)} />
       )}
+      {aiOpen && <AiPanel app={APP} onClose={() => setAiOpen(false)} />}
     </div>
   );
 }

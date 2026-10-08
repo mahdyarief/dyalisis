@@ -123,9 +123,9 @@ export default function DocsPanel({
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/40 backdrop-blur-sm"
+    <div className="anim-backdrop-in fixed inset-0 z-40 flex justify-end bg-black/40 backdrop-blur-sm"
       onClick={onClose} role="dialog" aria-modal="true" aria-label="Dokumentasi arsitektur">
-      <div className="no-scrollbar flex h-full w-full max-w-md flex-col gap-4 overflow-y-auto border-l bg-card p-4 shadow-xl"
+      <div className="anim-drawer-in no-scrollbar flex h-full w-full max-w-md flex-col gap-4 overflow-y-auto border-l bg-card p-4 shadow-xl"
         onClick={(e) => e.stopPropagation()}>
         <header className="flex items-start justify-between gap-2">
           <div>

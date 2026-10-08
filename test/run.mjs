@@ -252,8 +252,10 @@ function buildStyled(theme) {
   const n = cy.getElementById(sampleFeature.id);
   n.addClass('noted');
   const s = n.style();
-  check('kelas noted: pakai noteColor (pie)', s['pie-1-background-color'] === rgb(pal.noteColor), String(s['pie-1-background-color']));
-  check('kelas noted: irisan pie kecil (<50%)', num(s['pie-1-background-size']) < 50, String(s['pie-1-background-size']));
+  // Badge = dot lingkaran (background-image SVG), bukan lagi irisan pie.
+  const svg = decodeURIComponent(String(s['background-image']).replace(/^data:image\/svg\+xml,/, ''));
+  check('kelas noted: dot SVG pakai noteColor', svg.includes(`fill="${pal.noteColor}"`), String(s['background-image']).slice(0, 48));
+  check('kelas noted: dot di sudut kanan-atas', s['background-position-x'] === '100%' && s['background-position-y'] === '0%', `${s['background-position-x']} / ${s['background-position-y']}`);
 }
 
 // ===== Analisis graf (src/lib/analysis.js) — dipakai build & panel Insight =====

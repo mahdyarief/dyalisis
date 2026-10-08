@@ -50,7 +50,7 @@ function markAnchor(cy, selectedId) {
 }
 
 /** Cytoscape graph canvas. Controlled-ish: exposes the cy instance via onReady. */
-export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelect, selectedId, onReady, matchIds, flowPath = null, notedIds = null, theme = 'dark' }) {
+export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelect, selectedId, onReady, matchIds, flowPath = null, flowBranchIds = null, notedIds = null, theme = 'dark' }) {
   const containerRef = React.useRef(null);
   const cyRef = React.useRef(null);
   const layoutRef = React.useRef(null);       // layout yang sedang berjalan (untuk .stop())
@@ -129,7 +129,7 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
   React.useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
-    cy.elements().removeClass('faded highlight match anchor flow chain');
+    cy.elements().removeClass('faded highlight match anchor flow chain flow-start flow-end flow-branch');
 
     // Badge catatan (jembatan Manusia↔AI) — independen dari mode seleksi.
     if (notedIds && notedIds.length) {
@@ -167,6 +167,19 @@ export default function GraphCanvas({ nodes, edges, domains, layoutName, onSelec
       if (flowActive) {
         matched.addClass('flow');
         markChainEdges(cy, flowPath);
+        // Penanda arah: titik awal (hijau) & akhir (kuning) jalur agar batas
+        // dan orientasi alur terbaca sekilas, bukan sekadar deretan node menyala.
+        cy.getElementById(flowPath[0]).addClass('flow-start');
+        cy.getElementById(flowPath[flowPath.length - 1]).addClass('flow-end');
+        // Cabang alternatif (di luar jalur aktif): tetap terlihat (dashed) agar
+        // percabangan terbaca sebagai cabang — bukan hilang begitu saja.
+        (flowBranchIds || []).forEach((id) => {
+          const n = cy.getElementById(id);
+          if (n.nonempty()) {
+            n.removeClass('faded').addClass('flow-branch');
+            n.connectedEdges().removeClass('faded').addClass('flow-branch');
+          }
+        });
       }
       // Langkah yang sedang dipilih selalu ditandai, di mode apa pun.
       markAnchor(cy, selectedId);
