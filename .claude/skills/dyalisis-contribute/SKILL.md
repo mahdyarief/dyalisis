@@ -6,9 +6,9 @@ description: Panduan untuk AI agent yang ingin MENGEMBANGKAN/MENINGKATKAN engine
 # Dyalisis — panduan kontribusi engine
 
 Skill ini untuk **mengembangkan Dyalisis sendiri** (engine/framework). Untuk cara
-**memakai** Dyalisis sebagai framework content, baca
-[`../dyalisis/SKILL.md`](../dyalisis/SKILL.md). Dokumen lengkap (untuk manusia)
-ada di [`CONTRIBUTING.md`](../../../CONTRIBUTING.md).
+**memakai** Dyalisis sebagai framework content, baca skill `dyalisis`
+(satu folder di samping, `../dyalisis/SKILL.md`). Dokumen lengkap (untuk
+manusia) ada di `CONTRIBUTING.md` di repo dyalisis (relatif dari `.claude/skills/`: `../../../CONTRIBUTING.md`).
 
 ## Prinsip inti (jangan dilanggar)
 
@@ -25,7 +25,7 @@ ada di [`CONTRIBUTING.md`](../../../CONTRIBUTING.md).
 
 ```bash
 npm install
-npm test          # 77 self-check headless (semua PASS)
+npm test          # 80 self-check headless (semua PASS)
 npm run build     # → dist/index.html + dist/graph.json (demo dari src/data/example.js)
 ```
 
@@ -34,7 +34,10 @@ npm run build     # → dist/index.html + dist/graph.json (demo dari src/data/ex
 | Ingin menambah… | Sentuh file | Catatan |
 |---|---|---|
 | Layout baru (cose, klay, …) | `src/lib/layouts.js` — `LAYOUT_DEFS` | tambah `{ label, options }`; toolbar ikut otomatis |
-| Selector/warna visual | `src/lib/graph-style.js` — `buildGraphStyle`, `graphPalette` | urutan deklarasi = prioritas; paling spesifik **terakhir** |
+| Selector/warna visual | `src/lib/graph-style.js` — `buildGraphStyle(theme, reducedMotion)`, `graphPalette` | urutan deklarasi = prioritas; paling spesifik **terakhir**; `node.noted` = badge dot SVG (bukan pie) |
+| Navigasi kamera/collapse | `src/lib/navigation.js` — `collapseGraph` / `revealNode` / `syncElements` | `revealNode` auto-zoom framing 3–4 proses, zoom max 120%; hormati `prefers-reduced-motion` |
+| Minimap | `src/components/Minimap.jsx` | SVG inline, klik + tombol panah |
+| Panel Integrasi AI | `src/components/AiPanel.jsx` | endpoint di-derive dari URL runtime |
 | Algoritma Mode Alur | `src/lib/flow.js` — `buildActivePath` | kembalikan `{ path, edges, branches }` |
 | Analisis graf (hub/coupling/provenance) | `src/lib/analysis.js` | fungsi murni isomorphic; dipakai build + UI + test + MCP |
 | Panel Insight sidebar | `src/components/InsightPanel.jsx` | tampil saat tak ada node terpilih |
@@ -44,8 +47,11 @@ npm run build     # → dist/index.html + dist/graph.json (demo dari src/data/ex
 | Ingest spec Markdown → content | `lib/spec.mjs` + `src/lib/erd.js` | parser Node-only (`build --spec`); `erd.js` isomorphic Node+browser |
 | Renderer ERD (erDiagram) | `src/components/ErdDiagram.jsx` | SVG inline dari `erDiagram`, tema-aware, tanpa dependency |
 | Legenda | `src/components/Legend.jsx` | ikut saat menambah kelas visual baru |
-| Wiring app / state | `src/index.jsx` | content → elemen cytoscape, toolbar, sidebar |
-| Check verifikasi | `test/run.mjs` | `check('nama', kondisi)` |
+| Wiring app / state | `src/index.jsx` | content → elemen cytoscape, toolbar/filter, sidebar |
+| Check verifikasi | `test/run.mjs` | `check('nama', kondisi)` — 80 check headless |
+| Check publish/endpoint AI | `test/publish.mjs` | 45 check: server penerbit, `.json`/`.md`/`llms.txt`/MCP, auth |
+| Regresi browser (drag/zoom/mobile) | `test/browser.mjs` | Playwright-core + Chrome; butuh env `PLAYWRIGHT_MODULE` + `BROWSER_PATH` |
+| Multi-select filter (Domain/Level) | `src/index.jsx` — `facetDomain`/`facetLevel` (array) | pola `aria-pressed` + toggle per-opsi |
 | File hasil scaffold | `lib/scaffold.mjs` | yang di-copy saat `dyalisis init` |
 | Command CLI | `bin/dyalisis.mjs` | init / build / test |
 | Bundling | `build.mjs` | esbuild + tailwind → inline ke template |
@@ -73,8 +79,14 @@ Bila menambah kelas visual baru, tambahkan juga check resolve selector-nya
 ## Alur PR & rilis
 
 1. Branch dari `main`; implementasi + tambah/ubah check di `test/run.mjs`.
-2. `npm test` (hijau) dan `npm run build` (sukses).
-3. Perbarui doc bila alur berubah: `SKILL.md`, `README.md`, `AGENTS.md`.
-4. PR: jelaskan apa yang berubah, mengapa, dan bukti `npm test`/`build`.
-5. Rilis (maintainer): `npm version patch|minor|major` lalu `npm publish`.
+2. `npm test` (hijau), `node test/publish.mjs` (45 PASS), `npm run build`
+   (sukses), dan `git diff --check` (bersih).
+3. Kalau mengubah UI interaksi, jalankan juga `test/browser.mjs` headless
+   (lihat env `PLAYWRIGHT_MODULE`/`BROWSER_PATH` — Playwright-core di luar
+   paket, tidak menambah runtime dependency).
+4. Perbarui doc bila alur berubah: `SKILL.md`, `README.md`, `AGENTS.md`.
+5. PR: jelaskan apa yang berubah, mengapa, dan bukti test/build.
+6. Rilis (maintainer): bump versi serentak di `package.json` +
+   `package-lock.json` + `lib/graph-tools.mjs` (`SERVER_INFO.version`) +
+   `Dockerfile`/`docker-compose.yml` (tag image), lalu `npm publish`.
    Ingat field `files` di `package.json` menentukan apa yang ikut terbit.
